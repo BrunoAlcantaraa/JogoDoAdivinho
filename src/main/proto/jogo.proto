@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.bruno.grpc";
+option java_outer_classname = "AdvinharProto";
+
+import "google/protobuf/empty.proto";
+
+service Controller {
+
+  // Sorteia número para cliente
+  rpc entrar(JogadorRequest) returns (JogadorReply);
+
+  // Envia dica
+  rpc enviarDica(DicaRequest) returns (DicaReply);
+
+  // Tentativa de adivinhar
+  rpc advinharNumero(AdvinharRequest) returns (AdvinharReply);
+}
+
+message JogadorRequest {
+  string jogador = 1;
+}
+
+message JogadorReply {
+  bool sucesso = 1;
+  string message = 2;
+  int32 numero = 3;
+}
+
+message DicaRequest {
+  string autor = 1;
+  string dica = 2;
+}
+
+message DicaReply {
+  string message = 1;
+}
+
+message AdvinharRequest {
+  string jogador = 1;
+  string alvo = 2;
+  int32 numero = 3;
+}
+
+message AdvinharReply {
+  bool acertou = 1;
+  string message = 2;
+}
