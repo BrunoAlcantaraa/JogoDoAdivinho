@@ -3,21 +3,35 @@ package com.bruno.grpc;
 import com.bruno.grpc.repository.JogadorRepository;
 import io.grpc.stub.StreamObserver;
 
+import java.util.Map;
+
 public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
-    // Quantidade de Números possíveis
+    // CONFIGS
     private final int QTD_JOGADORES = 100;
 
     // "Banco de dados" dos jogadores
     private final JogadorRepository jogadorRepository = new JogadorRepository(QTD_JOGADORES);
 
+    // SETS
+    private String primeiroJogador;
+    private String jogadorAtual;
+    private EstadoJogo estadoJogo;
+    private int rodadaAtual;
+
     @Override
     public void entrar(JogadorRequest request, StreamObserver<JogadorReply> responseObserver) {
 
         // Pega o nick do jogador
-        String nick = request.getJogador();
+        String nick = request.getNick();
+
+        // Verifica se é o primeiro
+        if (jogadorRepository.getJogadores().isEmpty()) {
+            primeiroJogador = nick;
+        }
 
         // Tenta adicionar o jogador a lista
+
         int numSorteado = jogadorRepository.adicionar(nick);
 
         JogadorReply resposta;
@@ -44,9 +58,35 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     @Override
     public void enviarDica(DicaRequest request, StreamObserver<DicaReply> responseObserver) {
 
-        DicaReply resposta = DicaReply.newBuilder().setMessage("Dica recebida!").build();
+        String autor = request.getAutor();
+        String dica = request.getDica();
 
-        // Devolve
+        DicaReply mensagem = DicaReply.newBuilder()
+                .setMessage(autor + ": " + dica)
+                .build();
+
+        // envia para todos
+//        for (Map.Entry<String,
+//                StreamObserver<DicaReply>> entry
+//                : observers.entrySet()) {
+//
+//            String nick = entry.getKey();
+//
+//            // opcional: não enviar pra si mesmo
+//            if (!nick.equals(autor)) {
+//
+//                StreamObserver<DicaReply> observer =
+//                        entry.getValue();
+//
+//                observer.onNext(mensagem);
+//            }
+//        }
+
+        // responde ao autor
+        DicaReply resposta = DicaReply.newBuilder()
+                .setMessage("Dica enviada!")
+                .build();
+
         responseObserver.onNext(resposta);
         responseObserver.onCompleted();
     }
@@ -68,4 +108,42 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onNext(resposta);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void obterEstado(JogadorRequest request, StreamObserver<EstadoReply> responseObserver) {
+
+        // Pega o nick do client
+        String nick = request.getNick();
+
+        // Verifica se é o jogador inicial
+        boolean jogadorInicial = nick.equals(primeiroJogador);
+
+        EstadoReply resposta = EstadoReply.newBuilder()
+                .setJogadorAtual(true)
+                .setJogadorInicial(jogadorInicial)
+                .setRodada(rodadaAtual)
+                .build();
+
+        responseObserver.onNext(resposta);
+        responseObserver.onCompleted();
+    }
+
+    public void iniciar() {
+        for (String nickDono : jogadorRepository.getJogadores().keySet()) {
+
+            // Solicitar mensagem dica do jogador
+            jogadorAtual = nickDono;
+            estadoJogo = EstadoJogo.ESPERANDO_DICA;
+
+            for (String nickAdvinho : jogadorRepository.getJogadores().keySet()) {
+                // Mandar a dica para cada um
+            }
+
+            // Dar a chance de tentarem advinhar
+
+            rodadaAtual++;
+
+        }
+    }
+
 }
