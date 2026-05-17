@@ -1,261 +1,356 @@
 package com.bruno.grpc.view;
 
+import com.bruno.grpc.EstadoJogo;
+import com.bruno.grpc.EstadoReply;
+import com.bruno.grpc.AdvinharReply;
+import com.bruno.grpc.view.client.GrpcGameClient;
+import com.bruno.grpc.view.client.GameStatePoller;
+import com.bruno.grpc.view.entities.Mensagem;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import com.bruno.grpc.view.entities.ImagemJogo;
-import com.bruno.grpc.view.entities.Mensagem;
-import com.bruno.grpc.view.util.ImagemGerenciador;
-//import org.example.jogodoadivinhogui.ClassesCoisas.ImagemJogo;
-//import org.example.jogodoadivinhogui.ClassesCoisas.Mensagem;
-//import org.example.jogodoadivinhogui.Gerenciadores.ImagemGerenciador;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+/**
+ * Controller da tela principal do jogo.
+ *
+ * Responsabilidades:
+ *   - Gerenciar o ciclo de vida da conexão gRPC (via GrpcGameClient)
+ *   - Reagir a mudanças de estado vindas do GameStatePoller
+ *   - Receber mensagens do stream receberDicas e exibi-las no ListView
+ *   - Habilitar/desabilitar botões conforme o estado do jogo e turno do jogador
+ *   - Nunca bloquear a thread JavaFX: chamadas de rede rodam em executor de background
+ */
 public class HelloController {
 
-    private String PedirMensagem(String titulo, String mensagemRequisitada){ //padrão para pedir as mensagens
-        TextInputDialog requisitar = new TextInputDialog(); //cria a caixa de texto
+    // -----------------------------------------------------------------------
+    // FXML bindings
+    // -----------------------------------------------------------------------
 
-        requisitar.setTitle(titulo); //seta o titulo
-        requisitar.setHeaderText(mensagemRequisitada); //seta a mensagem da caixa
+    @FXML private ListView<Mensagem> listMensagens;
+    @FXML private TextField campoMensagem;
+    @FXML private ListView<String> listJogadores;
 
-        Optional<String> resultado =  requisitar.showAndWait(); //pega o que o user escreveu
+    @FXML private Label turnoLabel;
+    @FXML private Label turnoJogadorLabel;
+    @FXML private Label objetoLabel;
+    @FXML private Label jogadorLabel;
+    @FXML private Label pontuacaoLabel;
 
-        String dica = resultado.get().trim(); //tira os espaços a mais caso tenha
-        String[] palavras = dica.split("\\s+"); //separa as palavras
+    @FXML private ImageView objetoImagem;
 
-        return resultado.orElse(null); //retorna a mensagem ou retorna null caso não escreva nada
-    }
+    @FXML private Button btnIniciarJogo;
+    @FXML private Button btnEnviarDica;
+    @FXML private Button btnAdivinhar;
+    @FXML private Button btnEnviarMsg;
 
-    private void CriarAlerta(String titulo, String mensagem, String feedback){ //mostra uma tela de erro para o usuário
-        Alert alerta = new Alert(Alert.AlertType.ERROR);
+    // -----------------------------------------------------------------------
+    // Infraestrutura gRPC
+    // -----------------------------------------------------------------------
 
-        alerta.setTitle(titulo); //seta o titulo
-        alerta.setHeaderText(mensagem); //seta a mensagem
-        alerta.setContentText(feedback); //seta um feedback para o usuário
-        alerta.showAndWait(); //espera o usuário fechar
-    }
+    private GrpcGameClient grpcClient;
+    private GameStatePoller statePoller;
 
-    private void ValidarDica(String titulo, String mensagem) { //funcao para pegar a dica global
-        boolean continuar = true;
-        String[] palavras = new String[0];
-        
-        while (continuar) { //abre um while até ele fechar a tela ou passar por ela
-            String userResposta = PedirMensagem(
-                    titulo,
-                    mensagem);
+    /** Executor de background para chamadas de rede bloqueantes. */
+    private final ExecutorService bgExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "grpc-bg");
+        t.setDaemon(true);
+        return t;
+    });
 
-            if(userResposta != null) { //caso tenha alguma mensagem, ele vai criar um vetor para verificar depois o tamanho da dica
-                String dica = userResposta.trim();
-                palavras = dica.split("\\s+");
-            }
+    // -----------------------------------------------------------------------
+    // Estado local da tela
+    // -----------------------------------------------------------------------
 
-            if (userResposta == null) { //caso ele aperte em cancelar
-                return; //volta para a tela normal
-            } else if (userResposta.isBlank()){ //caso esteja em branco
-                CriarAlerta(
-                        "ERRO",
-                        "Dica está vazia",
-                        "Não deixe a dica em branco"
-                );
-            } else if (palavras.length > 1){ //se a dica for muito longa (ter mais de uma palavra)
-                CriarAlerta(
-                        "ERRO",
-                        "Dica muito longa",
-                        "Escreva apenas uma palavra"
-                );
-            } else {
-                continuar = false; //termina o loop
-            }
-        }
-    }
+    private EstadoJogo estadoAtual = EstadoJogo.ESPERANDO_INICIAR_JOGO;
+    private String jogadorAtualNoServidor = "";
+    private boolean jaAdinvinhouNessaRodada = false;
+    private String alvoTentadoNessaRodada = "";
+
+    // -----------------------------------------------------------------------
+    // Inicialização
+    // -----------------------------------------------------------------------
 
     @FXML
-    private void RequisitarDicaGlobal(){
-        ValidarDica("Enviar dica global", "Digite no máximo uma palavra");
-        EnviarMsgSistema("O jogador X enviou uma dica a todos os jogadores");
+    public void initialize() {
+        // Deixa tudo desabilitado até o login
+        desabilitarTudo();
+        carregarImagemPadrao();
+
+        // Pede o nick logo ao abrir a tela
+        Platform.runLater(this::solicitarLogin);
     }
 
-    private void RequisitarDicaPrivada(){
-        ValidarDica("Enviar dica privada", "Digite no máximo uma palavra e a dica pode ser mentira");
-    }
+    /** Abre um dialog de login e conecta ao servidor. */
+    private void solicitarLogin() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Entrar no jogo");
+        dialog.setHeaderText("Digite seu nick para entrar:");
+        dialog.setContentText("Nick:");
 
-    private void RequisitarPalpite() { //caso algum objeto possa ter mais que uma palavra, vamos ter que mudar um pouco o código
-        ValidarDica("Enviar palpite", "Digite o objeto (no máximo uma palavra)");
-    }
+        // Impede que o usuário feche sem digitar
+        Optional<String> resultado = dialog.showAndWait();
 
-    @FXML
-    private ListView<Mensagem> listMensagens;
-
-    @FXML
-    private TextField campoMensagem;
-
-    @FXML
-    private void EnviarMSG(){ //envia mensagem no chat
-        String texto = campoMensagem.getText(); //pega o texto do campo
-
-        if(texto == null || texto.trim().isEmpty()){ //verifica se o botao for apertado enqt vazio
+        if (resultado.isEmpty() || resultado.get().trim().isEmpty()) {
+            mostrarAlerta("Erro", "Nick obrigatório", "Você precisa digitar um nick para jogar.");
+            solicitarLogin();
             return;
         }
 
-        Mensagem msg = new Mensagem(
-                texto,
-                "Ian",
-                LocalDateTime.now()
-        );
+        String nick = resultado.get().trim();
 
-        listMensagens.getItems().add(msg); //adiciona na lista
+        // Cria o cliente e entra em background (evita travar JavaFX)
+        grpcClient = new GrpcGameClient();
 
-        campoMensagem.clear(); //limpa o campo
+        bgExecutor.submit(() -> {
+            grpcClient.entrar(
+                    nick,
+                    (n, numero, msg) -> Platform.runLater(() -> aoEntrarComSucesso(n, numero, msg)),
+                    erro -> Platform.runLater(() -> {
+                        mostrarAlerta("Erro ao entrar", "Não foi possível entrar no jogo", erro);
+                        solicitarLogin();
+                    })
+            );
+        });
     }
 
-    private void EnviarMsgSistema(String texto){
-        Mensagem msg = new Mensagem(
-                texto,
-                "Sistema",
-                LocalDateTime.now()
-        );
+    /** Chamado na thread JavaFX após entrar com sucesso. */
+    private void aoEntrarComSucesso(String nick, int meuNumero, String mensagemServidor) {
+        // Atualiza labels com dados do jogador
+        jogadorLabel.setText("Jogador: " + nick);
+        pontuacaoLabel.setText("Pontuação: 0");
+        objetoLabel.setText("Seu número: " + meuNumero);
 
-        listMensagens.getItems().add(msg);
+        adicionarMensagemSistema(mensagemServidor);
+        adicionarMensagemSistema("Seu número secreto é: " + meuNumero + " — não conta para ninguém!");
+
+        // Abre o stream de dicas em background
+        bgExecutor.submit(() -> grpcClient.receberDicas(
+                msg -> Platform.runLater(() -> adicionarMensagemSistema(msg)),
+                () -> Platform.runLater(() -> adicionarMensagemSistema("[Sistema] Stream encerrado.")),
+                erro -> Platform.runLater(() -> adicionarMensagemSistema("[Erro] " + erro))
+        ));
+
+        // Inicia o polling de estado
+        statePoller = new GameStatePoller(grpcClient, this::aoEstadoMudar);
+        statePoller.iniciar();
+    }
+
+    // -----------------------------------------------------------------------
+    // Reação a mudanças de estado (chamado pelo GameStatePoller via Platform.runLater)
+    // -----------------------------------------------------------------------
+
+    private void aoEstadoMudar(EstadoReply estado) {
+        estadoAtual = estado.getEstado();
+        jogadorAtualNoServidor = estado.getJogadorAtual();
+        int rodada = estado.getRodada();
+
+        // Atualiza labels de turno/rodada
+        turnoLabel.setText("Rodada " + rodada);
+        turnoJogadorLabel.setText("Vez de: " + (jogadorAtualNoServidor.isEmpty() ? "—" : jogadorAtualNoServidor));
+
+        String meuNick = grpcClient.getNick();
+
+        // Reseta flag de "já tentou adivinhar" quando o alvo muda
+        if (!alvoTentadoNessaRodada.equals(jogadorAtualNoServidor)) {
+            jaAdinvinhouNessaRodada = false;
+            alvoTentadoNessaRodada = jogadorAtualNoServidor;
+        }
+
+        // Habilita/desabilita botões conforme estado e quem é o jogador local
+        switch (estadoAtual) {
+            case ESPERANDO_INICIAR_JOGO -> {
+                boolean souInicial = meuNick.equals(estado.getJogadorInicial());
+                btnIniciarJogo.setDisable(!souInicial);
+                btnEnviarDica.setDisable(true);
+                btnAdivinhar.setDisable(true);
+
+                if (!souInicial && !estado.getJogadorInicial().isEmpty()) {
+                    turnoJogadorLabel.setText("Aguardando " + estado.getJogadorInicial() + " iniciar...");
+                }
+            }
+            case ESPERANDO_DICA -> {
+                btnIniciarJogo.setDisable(true);
+                boolean minhaVez = meuNick.equals(jogadorAtualNoServidor);
+                btnEnviarDica.setDisable(!minhaVez);
+                btnAdivinhar.setDisable(true);
+            }
+            case ESPERANDO_ADVINHAR -> {
+                btnIniciarJogo.setDisable(true);
+                btnEnviarDica.setDisable(true);
+                boolean possoAdivinhar = !meuNick.equals(jogadorAtualNoServidor) && !jaAdinvinhouNessaRodada;
+                btnAdivinhar.setDisable(!possoAdivinhar);
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Ações dos botões (todos chamam rede em background)
+    // -----------------------------------------------------------------------
+
+    @FXML
+    private void aoIniciarJogo() {
+        btnIniciarJogo.setDisable(true);
+
+        bgExecutor.submit(() -> {
+            try {
+                String msg = grpcClient.iniciarJogo();
+                Platform.runLater(() -> adicionarMensagemSistema("[Servidor] " + msg));
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    mostrarAlerta("Erro", "Falha ao iniciar jogo", e.getMessage());
+                    btnIniciarJogo.setDisable(false);
+                });
+            }
+        });
     }
 
     @FXML
-    private ListView<String> listJogadores; //dps troque para <jogador> para ele listar jogadores mesmo, isso é so um exemplo
-
-    /*
-    parte de teste, essa lista é inicializada pra testar a parte de selecionar jogador
-    quando for integrar com o rpc provavelmente será necessário transformar em uma lista de classe jogador
-    igual fiz com mensagem, mas dai depende da funcionalidade de jogadores
-     */
-    List<String> jogadores = Arrays.asList(
-            "Ian",
-            "Brunin",
-            "Japones safado",
-            "Igão",
-            "Jefinho"
-    );
-
-    private String RequisitarJogador(String titulo, String Mensagem){ //padrão para usar em mais funções
-        ChoiceDialog<String> dialog = new ChoiceDialog<>("Jogador", jogadores);
-
-        dialog.setTitle(titulo);
-        dialog.setHeaderText(Mensagem);
+    private void aoEnviarDica() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Enviar Dica");
+        dialog.setHeaderText("Digite sua dica (uma palavra):");
 
         Optional<String> resultado = dialog.showAndWait();
+        if (resultado.isEmpty() || resultado.get().trim().isEmpty()) return;
 
-        return resultado.orElse(null);
+        String dica = resultado.get().trim();
+        String[] palavras = dica.split("\\s+");
+
+        if (palavras.length > 1) {
+            mostrarAlerta("Erro", "Dica inválida", "A dica deve ser uma única palavra.");
+            return;
+        }
+
+        btnEnviarDica.setDisable(true);
+
+        bgExecutor.submit(() -> {
+            try {
+                String msg = grpcClient.enviarDica(dica);
+                Platform.runLater(() -> adicionarMensagemSistema("[Servidor] " + msg));
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    mostrarAlerta("Erro", "Falha ao enviar dica", e.getMessage());
+                    // Re-habilita se ainda for a vez do jogador
+                    if (grpcClient.getNick().equals(jogadorAtualNoServidor)
+                            && estadoAtual == EstadoJogo.ESPERANDO_DICA) {
+                        btnEnviarDica.setDisable(false);
+                    }
+                });
+            }
+        });
     }
 
     @FXML
-    private void RequisitarJogadorDicaPrivada(){
-        boolean continuar = true;
+    private void aoAdivinhar() {
+        // Pede o número a adivinhar
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Adivinhar");
+        dialog.setHeaderText("Tente adivinhar o número de " + jogadorAtualNoServidor + " (1–100):");
 
-        while (continuar) {
-            String jogador = RequisitarJogador("Requisitar troca de dicas", "Selecione um jogador"); //abrir a dialogchoice
+        Optional<String> resultado = dialog.showAndWait();
+        if (resultado.isEmpty() || resultado.get().trim().isEmpty()) return;
 
-            if (Objects.equals(jogador, "Jogador")) { //caso a opção seleciona seja a padrão
-                CriarAlerta(
-                        "ERRO",
-                        "Jogador inválido selecionado",
-                        "Selecione um jogador válido"
-                );
-            }else if(jogador == null){ //caso ele aperte em cancelar
-                return;
+        int numero;
+        try {
+            numero = Integer.parseInt(resultado.get().trim());
+        } catch (NumberFormatException e) {
+            mostrarAlerta("Erro", "Número inválido", "Digite apenas números inteiros.");
+            return;
+        }
+
+        btnAdivinhar.setDisable(true);
+        jaAdinvinhouNessaRodada = true;
+
+        final String alvo = jogadorAtualNoServidor;
+        final int numFinal = numero;
+
+        bgExecutor.submit(() -> {
+            try {
+                AdvinharReply resp = grpcClient.advinharNumero(alvo, numFinal);
+                Platform.runLater(() -> {
+                    adicionarMensagemSistema("[Servidor] " + resp.getMessage());
+                    if (resp.getAcertou()) {
+                        mostrarInfo("Acertou!", "Parabéns!", "Você acertou o número de " + alvo + "!");
+                    }
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    jaAdinvinhouNessaRodada = false;
+                    mostrarAlerta("Erro", "Falha ao adivinhar", e.getMessage());
+                });
             }
-            else{ //caso ele selecione um jogador
-                RequisitarDicaPrivada(); //faz o processo de receber uma dica
-                EnviarMsgSistema("Jogador X trocou uma dica com o jogador " + jogador); //sistema informa a troca de dicas
-                continuar = false; //sai do loop para voltar a tela
-            }
+        });
+    }
+
+    /** Envio de mensagem local no chat (sem integração gRPC — campo de chat local). */
+    @FXML
+    private void aoEnviarMSG() {
+        String texto = campoMensagem.getText();
+        if (texto == null || texto.trim().isEmpty()) return;
+
+        String nick = grpcClient != null ? grpcClient.getNick() : "Eu";
+        listMensagens.getItems().add(new Mensagem(texto.trim(), nick, LocalDateTime.now()));
+        campoMensagem.clear();
+    }
+
+    // -----------------------------------------------------------------------
+    // Utilitários de UI
+    // -----------------------------------------------------------------------
+
+    private void adicionarMensagemSistema(String texto) {
+        listMensagens.getItems().add(new Mensagem(texto, "Sistema", LocalDateTime.now()));
+        // Rola para a última mensagem
+        int ultimo = listMensagens.getItems().size() - 1;
+        if (ultimo >= 0) listMensagens.scrollTo(ultimo);
+    }
+
+    private void desabilitarTudo() {
+        if (btnIniciarJogo != null) btnIniciarJogo.setDisable(true);
+        if (btnEnviarDica != null)  btnEnviarDica.setDisable(true);
+        if (btnAdivinhar != null)   btnAdivinhar.setDisable(true);
+    }
+
+    private void carregarImagemPadrao() {
+        try {
+            Image img = new Image(Objects.requireNonNull(
+                    getClass().getResourceAsStream("/img/oldspice.png")));
+            if (objetoImagem != null) objetoImagem.setImage(img);
+        } catch (Exception e) {
+            // Imagem não encontrada — ignora silenciosamente
         }
     }
 
-    @FXML
-    private void RequisitarJogadorAdivinhar(){
-        boolean continuar = true;
-
-        while (continuar) {
-            String jogador = RequisitarJogador("Adivinhar", "Selecione um jogador para adivinhar");
-            if (Objects.equals(jogador, "Jogador")) {
-                CriarAlerta("ERRO",
-                        "Jogador inválido selecionado",
-                        "Selecione um jogador válido"
-                );
-            }else if (jogador == null){
-                return;
-            }else{
-                RequisitarPalpite();
-                EnviarMsgSistema("O jogador X tentou fazer um palpite"); //mudar o X para o jogador em si
-                continuar = false;
-            }
-        }
-
+    private void mostrarAlerta(String titulo, String cabecalho, String conteudo) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(titulo);
+        alert.setHeaderText(cabecalho);
+        alert.setContentText(conteudo);
+        alert.showAndWait();
     }
 
-    @FXML
-    private Label turnoLabel = new Label();
-    int numeroTurno = 1;
-
-    @FXML
-    private void PassarTurno(){ //a lógica depende um pouco do back, ent eu vou só fazer uma função que passa o numero
-        numeroTurno++;
-        turnoLabel.setText("Turno " + numeroTurno);
+    private void mostrarInfo(String titulo, String cabecalho, String conteudo) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(titulo);
+        alert.setHeaderText(cabecalho);
+        alert.setContentText(conteudo);
+        alert.showAndWait();
     }
 
-    @FXML
-    private Label objetoLabel = new Label(); //dps disso a lógica para definir o nome do objeto na tela
+    // -----------------------------------------------------------------------
+    // Cleanup ao fechar a janela (chamar em HelloApplication.stop())
+    // -----------------------------------------------------------------------
 
-    @FXML
-    private Label jogadorLabel = new Label(); //dps disso a lógica para mudar o nome do jogador na tela
-
-    @FXML
-    private Label turnoJogadorLabel = new Label(); //esse é o label q fala de qual jogador está a vez
-
-    @FXML
-    private Label pontuacaoLabel = new Label(); //dps disso a lógica para mudar a pontuação
-
-    @FXML
-    private ImageView objetoImagem = new ImageView(); //imagem do objeto na interface
-
-    ImagemGerenciador imagemGerenciador = new ImagemGerenciador(); //gerenciador para pegar o objeto
-
-    int id = 1; //DEPOIS ISSO PRECISA SER MUDADO PARA SER O NUMERO Q O JOGADOR RECEBE NO INICIO
-
-    private ImagemJogo BuscarObjeto(int id){
-        for(ImagemJogo imagem : imagemGerenciador.imagens){ //vai passando por todos os objetos na lista criada no gerenciador
-            if(imagem.getIdObjeto() == id){ //se for igual ele retorna o objeto
-                return imagem;
-            }
-        }
-        return null;
-    }
-
-    private Image DefinirImagem(){
-
-        ImagemJogo imagem = BuscarObjeto(id); //pega a imagem
-
-        if(imagem != null) {
-            objetoLabel.setText("Objeto: " + imagem.getNomeObjeto()); //define o nome do objeto
-            return new Image(
-                    Objects.requireNonNull(
-                            getClass().getResourceAsStream(
-                                    imagem.getCaminhoImagem() //define o caminho para o imageview
-                            )
-                    )
-            );
-        }
-
-        return null;
-    }
-
-    @FXML
-    public void initialize() { //ao iniciar a tela ele já pega a imagem e seta
-
-        objetoImagem.setImage(
-                DefinirImagem()
-        );
+    public void shutdown() {
+        if (statePoller != null) statePoller.parar();
+        if (grpcClient != null) grpcClient.shutdown();
+        bgExecutor.shutdownNow();
     }
 }
