@@ -1,0 +1,4 @@
+module-info.class
+org\example\jogodoadivinhogui\Launcher.class
+org\example\jogodoadivinhogui\HelloApplication.class
+org\example\jogodoadivinhogui\HelloController.class
