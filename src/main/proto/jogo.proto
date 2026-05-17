@@ -8,11 +8,14 @@ import "google/protobuf/empty.proto";
 
 service Controller {
 
+  // Inicia o jogo
+  rpc iniciarJogo(google.protobuf.Empty) returns (DicaReply);
+
   // Sorteia número para cliente
   rpc entrar(JogadorRequest) returns (JogadorReply);
 
   // Obtem estado do jogador
-  rpc obterEstado(JogadorRequest) returns (EstadoReply);
+  rpc obterEstado(google.protobuf.Empty) returns (EstadoReply);
 
   // Envia dica
   rpc enviarDica(DicaRequest) returns (DicaReply);
@@ -23,20 +26,27 @@ service Controller {
   rpc advinharNumero(AdvinharRequest) returns (AdvinharReply);
 }
 
+enum EstadoJogo {
+  ESPERANDO_INICIAR_JOGO = 0;
+  ESPERANDO_DICA = 1;
+  ESPERANDO_ADVINHAR = 2;
+}
+
 message JogadorRequest {
   string nick = 1;
 }
 
 message JogadorReply {
   bool sucesso = 1;
-  string message = 3;
-  int32 numero = 4;
+  string message = 2;
+  int32 numero = 3;
 }
 
 message EstadoReply {
-  bool jogadorAtual = 1;
-  bool jogadorInicial = 2;
+  string jogadorAtual = 1;
+  string jogadorInicial = 2;
   int32 rodada = 3;
+  EstadoJogo estado = 4;
 }
 
 message DicaRequest {

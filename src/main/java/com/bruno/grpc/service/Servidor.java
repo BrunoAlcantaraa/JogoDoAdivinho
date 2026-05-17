@@ -1,5 +1,6 @@
-package com.bruno.grpc;
+package com.bruno.grpc.service;
 
+import com.bruno.grpc.controller.ControllerImpl;
 import io.grpc.Grpc;
 import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
@@ -21,5 +22,4 @@ public class Servidor {
 
         server.awaitTermination();
     }
-
 }
