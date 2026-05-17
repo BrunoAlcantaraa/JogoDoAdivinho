@@ -55,20 +55,19 @@ public class HelloController {
 
             if (userResposta == null) { //caso ele aperte em cancelar
                 return; //volta para a tela normal
-            }else if(userResposta.isBlank()){ //caso esteja em branco
+            } else if (userResposta.isBlank()){ //caso esteja em branco
                 CriarAlerta(
                         "ERRO",
                         "Dica está vazia",
                         "Não deixe a dica em branco"
                 );
-            }else if(palavras.length > 1){ //se a dica for muito longa (ter mais de uma palavra)
+            } else if (palavras.length > 1){ //se a dica for muito longa (ter mais de uma palavra)
                 CriarAlerta(
                         "ERRO",
                         "Dica muito longa",
                         "Escreva apenas uma palavra"
                 );
-            }
-            else{
+            } else {
                 continuar = false; //termina o loop
             }
         }
@@ -84,7 +83,7 @@ public class HelloController {
         ValidarDica("Enviar dica privada", "Digite no máximo uma palavra e a dica pode ser mentira");
     }
 
-    private void RequisitarPalpite(){ //caso algum objeto possa ter mais que uma palavra, vamos ter que mudar um pouco o código
+    private void RequisitarPalpite() { //caso algum objeto possa ter mais que uma palavra, vamos ter que mudar um pouco o código
         ValidarDica("Enviar palpite", "Digite o objeto (no máximo uma palavra)");
     }
 

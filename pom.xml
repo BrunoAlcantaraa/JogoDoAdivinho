@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.ib</groupId>
@@ -11,10 +14,17 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <grpc.version>1.81.0</grpc.version>
+        <protobuf.version>3.25.8</protobuf.version>
+
+        <javafx.version>17.0.12</javafx.version>
     </properties>
 
     <build>
+
         <extensions>
             <extension>
                 <groupId>kr.motd.maven</groupId>
@@ -22,76 +32,129 @@
                 <version>1.7.1</version>
             </extension>
         </extensions>
+
         <plugins>
+
+            <!-- COMPILADOR JAVA -->
             <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+
                 <configuration>
-                    <mainClass>seu.pacote.Main</mainClass> <!-- Substitua pelo caminho da sua classe principal -->
+                    <source>17</source>
+                    <target>17</target>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>kr.motd.maven</groupId>
-                <artifactId>os-maven-plugin</artifactId>
-                <version>1.7.0</version>
-                <executions>
-                    <execution>
-                        <phase>initialize</phase>
-                        <goals>
-                            <goal>detect</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+
+            <!-- PROTOBUF + GRPC -->
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>0.6.1</version>
+
                 <configuration>
-                    <protocArtifact>com.google.protobuf:protoc:3.25.8:exe:${os.detected.classifier}</protocArtifact>
+
+                    <protocArtifact>
+                        com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+                    </protocArtifact>
+
                     <pluginId>grpc-java</pluginId>
-                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.81.0:exe:${os.detected.classifier}</pluginArtifact>
+
+                    <pluginArtifact>
+                        io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}
+                    </pluginArtifact>
+
                 </configuration>
+
                 <executions>
                     <execution>
+
                         <goals>
                             <goal>compile</goal>
                             <goal>compile-custom</goal>
                         </goals>
+
                     </execution>
                 </executions>
+
             </plugin>
+
+            <!-- JAVAFX -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+
+                <configuration>
+
+                    <!-- TROQUE PELO SEU MAIN -->
+                    <mainClass>
+                        com.bruno.grpc.view.Launcher
+                    </mainClass>
+
+                </configuration>
+
+            </plugin>
+
         </plugins>
+
     </build>
 
     <dependencies>
+
+        <!-- ========================= -->
+        <!-- gRPC -->
+        <!-- ========================= -->
+
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty-shaded</artifactId>
-            <version>1.81.0</version>
-            <scope>runtime</scope>
+            <version>${grpc.version}</version>
         </dependency>
+
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-protobuf</artifactId>
-            <version>1.81.0</version>
+            <version>${grpc.version}</version>
         </dependency>
+
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
-            <version>1.81.0</version>
+            <version>${grpc.version}</version>
         </dependency>
+
+        <!-- protobuf -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf.version}</version>
+        </dependency>
+
+        <!-- necessário no Java 9+ -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+
+        <!-- ========================= -->
+        <!-- JavaFX -->
+        <!-- ========================= -->
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>23.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>23.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
+
     </dependencies>
 
 </project>

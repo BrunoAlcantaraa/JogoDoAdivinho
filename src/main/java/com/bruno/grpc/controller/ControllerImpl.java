@@ -9,13 +9,10 @@ import io.grpc.stub.StreamObserver;
 
 public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
-    // CONFIGS
     private final int QTD_NUMEROS = 100;
 
-    // "Banco de dados" dos jogadores
     private final JogadorRepository jogadorRepository = new JogadorRepository(QTD_NUMEROS);
 
-    // Estado do jogo (sincronizado entre threads)
     private String jogadorAtual = "";
     private String jogadorInicial = "";
     private int rodadaAtual = 0;
@@ -39,7 +36,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         JogadorReply resposta;
 
         if (numSorteado == -1) {
-            // Nick já em uso
             resposta = JogadorReply.newBuilder()
                     .setSucesso(false)
                     .setMessage("Esse nick já está em uso!")
@@ -61,11 +57,9 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
         String nick = request.getNick();
 
-        // Localiza o jogador no repositório
         Jogador jogador = jogadorRepository.buscar(nick);
 
         if (jogador == null) {
-            // Jogador não registrado — encerra o stream com erro
             responseObserver.onError(
                     io.grpc.Status.NOT_FOUND
                             .withDescription("Jogador '" + nick + "' não encontrado. Use entrar() primeiro.")
@@ -83,8 +77,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build();
         responseObserver.onNext(boasVindas);
 
-        // O stream permanece ABERTO — o servidor enviará mensagens via observer quando necessário.
-        // NÃO chame responseObserver.onCompleted() aqui.
     }
 
     @Override
@@ -129,6 +121,9 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     @Override
     public synchronized void advinharNumero(AdvinharRequest request, StreamObserver<AdvinharReply> responseObserver) {
 
+        Jogador jogadorTentandoAdvinhar = jogadorRepository.buscar(request.getJogador());
+        Jogador jogadorAlvo = jogadorRepository.buscar(jogadorAtual);
+
         if (estadoJogo != EstadoJogo.ESPERANDO_ADVINHAR) {
             responseObserver.onNext(AdvinharReply.newBuilder()
                     .setAcertou(false)
@@ -147,9 +142,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
-        Jogador alvo = jogadorRepository.buscar(jogadorAtual);
-
-        if (alvo == null) {
+        if (jogadorAlvo == null) {
             responseObserver.onNext(AdvinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Jogador da vez não encontrado.")
@@ -158,7 +151,9 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
-        boolean acertou = request.getNumero() == alvo.getNumero();
+        boolean acertou = request.getNumero() == jogadorAlvo.getNumero();
+
+        jogadorTentandoAdvinhar.setTentouAdvinhar(true);
 
         if (acertou) {
             notificarTodos(DicaReply.newBuilder()
@@ -175,7 +170,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                             + " tentou " + request.getNumero() + " e errou.")
                     .build());
 
-            if (jogadorRepository.todosTentaramAdvinhar()) {
+            if (jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
                 notificarTodos(DicaReply.newBuilder()
                         .setMessage("[Servidor] Ninguém acertou o número de " + jogadorAtual + ". Próxima vez!")
                         .build());

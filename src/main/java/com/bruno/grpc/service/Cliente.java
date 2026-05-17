@@ -72,8 +72,6 @@ public class Cliente {
                 System.out.println("[STREAM] Stream de dicas encerrado pelo servidor.");
             }
         });
-
-        System.out.println("Stream de dicas aberto. Aguardando mensagens...");
     }
 
     public void tentarAdvinhar(String alvo, Scanner scanner) {
@@ -148,6 +146,7 @@ public class Cliente {
                         }
 
                     } else {
+
                         System.out.println("Os outros estão tentando adivinhar seu número...");
                         Thread.sleep(1000);
                     }

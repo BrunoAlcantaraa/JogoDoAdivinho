@@ -9,7 +9,7 @@
 <?import javafx.scene.shape.Rectangle?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="641.0" prefWidth="979.0" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.example.jogodoadivinhogui.HelloController">
+<AnchorPane prefHeight="641.0" prefWidth="979.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bruno.grpc.view.HelloController">
    <children>
       <Rectangle arcHeight="5.0" arcWidth="5.0" fill="#898989" height="367.0" layoutX="232.0" layoutY="53.0" stroke="BLACK" strokeType="INSIDE" width="514.0" />
       <ImageView fx:id="objetoImagem" fitHeight="373.0" fitWidth="514.0" layoutX="233.0" layoutY="50.0" pickOnBounds="true" preserveRatio="true" />
