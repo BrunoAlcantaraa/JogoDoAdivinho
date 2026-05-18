@@ -29,6 +29,23 @@ public class JogadorRepository {
         return imagem.getNomeObjeto();
     }
 
+    public String sortearNovoObjeto(String nick) {
+        Jogador jogador = jogadores.get(nick);
+        if (jogador == null) return null;
+
+        ImagemObjeto objetoAtual = jogador.getObjeto();
+        ImagemObjeto novoObjeto = ImagemGerenciador.getImagemAleatoria();
+
+        if (ImagemGerenciador.imagens.size() > 1 && objetoAtual != null) {
+            while (novoObjeto.getNomeObjeto().equals(objetoAtual.getNomeObjeto())) {
+                novoObjeto = ImagemGerenciador.getImagemAleatoria();
+            }
+        }
+
+        jogador.setObjeto(novoObjeto);
+        return novoObjeto.getNomeObjeto();
+    }
+
     public boolean todosTentaramAdvinhar(String dono) {
         for (Jogador jogador : jogadores.values()) {
             if (!jogador.isTentouAdvinhar() && !jogador.getNick().equals(dono)) {

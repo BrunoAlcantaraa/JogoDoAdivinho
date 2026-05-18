@@ -103,6 +103,17 @@ public class GrpcGameClient {
         return blockingStub.adivinharObjeto(req);
     }
 
+    public String atualizarMeuObjeto() {
+        JogadorRequest req = JogadorRequest.newBuilder().setNick(nick).build();
+        JogadorReply resp = blockingStub.obterMeuObjeto(req);
+
+        if (resp.getSucesso()) {
+            this.objeto = resp.getObjeto();
+        }
+
+        return this.objeto;
+    }
+
     /**
      * Retorna a lista de jogadores com pontuação atual.
      */

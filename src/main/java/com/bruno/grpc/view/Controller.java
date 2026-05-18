@@ -45,6 +45,7 @@ public class Controller {
     @FXML private Label objetoLabel;
     @FXML private Label jogadorLabel;
     @FXML private Label pontuacaoLabel;
+    @FXML private Label esperaLabel;
 
     // Área central — painel raiz (StackPane)
     @FXML private StackPane painelCentral;
@@ -88,6 +89,7 @@ public class Controller {
     private String jogadorAtualNoServidor = "";
     private boolean jaAdivinhouNessaRodada = false;
     private String alvoTentadoNessaRodada = "";
+    private String turnoObjetoAtualizado = "";
     // Controle de limpeza de notificações por rodada
     private int ultimaRodadaNotificada = -1;
 
@@ -202,6 +204,7 @@ public class Controller {
                 btnIniciarJogo.setDisable(!souInicial);
                 btnEnviarDica.setDisable(true);
                 btnAdivinhar.setDisable(true);
+                esperaLabel.setText("Aguardando o jogo iniciar...");
                 mostrarPainel(painelEspera);
 
                 if (!souInicial && !estado.getJogadorInicial().isEmpty()) {
@@ -216,9 +219,11 @@ public class Controller {
                 btnAdivinhar.setDisable(true);
 
                 if (minhaVez) {
+                    atualizarObjetoDaMinhaVez(rodada);
                     atualizarPainelSuaVez();
                     mostrarPainel(painelSuaVez);
                 } else {
+                    esperaLabel.setText("Aguardando " + jogadorAtualNoServidor + " dar a dica...");
                     mostrarPainel(painelEspera);
                 }
             }
@@ -236,6 +241,7 @@ public class Controller {
                     dicaAutorLabel.setText("por " + (autor.isEmpty() ? "—" : autor));
                     mostrarPainel(painelDica);
                 } else {
+                    esperaLabel.setText("Aguardando dica...");
                     mostrarPainel(painelEspera);
                 }
             }
@@ -405,6 +411,26 @@ public class Controller {
         } catch (Exception e) {
             objetoImagemSuaVez.setImage(null);
         }
+    }
+
+    private void atualizarObjetoDaMinhaVez(int rodada) {
+        if (grpcClient == null) return;
+
+        String chaveTurno = rodada + ":" + jogadorAtualNoServidor;
+        if (chaveTurno.equals(turnoObjetoAtualizado)) return;
+        turnoObjetoAtualizado = chaveTurno;
+
+        bgExecutor.submit(() -> {
+            try {
+                String objetoAtual = grpcClient.atualizarMeuObjeto();
+                Platform.runLater(() -> {
+                    objetoLabel.setText("Seu objeto: " + objetoAtual);
+                    atualizarPainelSuaVez();
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> adicionarNotificacao("Erro ao atualizar objeto."));
+            }
+        });
     }
 
     private void carregarImagemObjeto(String nomeObjeto) {

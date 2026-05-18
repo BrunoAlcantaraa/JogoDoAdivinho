@@ -29,6 +29,36 @@ public class ImagemGerenciador {
                 "Tesoura",
                 "img/Tesoura.png"
         ));
+
+        imagens.add(new ImagemObjeto(
+                4,
+                "Cadeira",
+                "img/Cadeira.png"
+        ));
+
+        imagens.add(new ImagemObjeto(
+                5,
+                "Notebook",
+                "img/Notebook.png"
+        ));
+
+        imagens.add(new ImagemObjeto(
+                6,
+                "Copo",
+                "img/Copo.png"
+        ));
+
+        imagens.add(new ImagemObjeto(
+                7,
+                "Mouse",
+                "img/Mouse.png"
+        ));
+
+        imagens.add(new ImagemObjeto(
+                8,
+                "Teclado",
+                "img/Teclado.png"
+        ));
     }
 
     public static ImagemObjeto getImagemAleatoria() {

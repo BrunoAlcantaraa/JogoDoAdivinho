@@ -31,6 +31,9 @@ service Controller {
 
   // Lista todos os jogadores com pontuação
   rpc listarJogadores(google.protobuf.Empty) returns (ListaJogadoresReply);
+
+  // Retorna o objeto secreto atual do jogador
+  rpc obterMeuObjeto(JogadorRequest) returns (JogadorReply);
 }
 
 enum EstadoJogo {

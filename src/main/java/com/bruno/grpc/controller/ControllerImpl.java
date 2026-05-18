@@ -13,8 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
-    // Pontos ganhos ao acertar o objeto de outro jogador
-    private static final int PONTOS_ACERTO = 1;
+    // O acerto vale mais para quem acerta primeiro na rodada.
+    private static final int PONTOS_PRIMEIRO_ACERTO = 5;
+    private static final int PONTOS_SEGUNDO_ACERTO = 3;
+    private static final int PONTOS_DEMAIS_ACERTOS = 1;
+    private static final int PONTOS_BONUS_DICA = 2;
 
     private final JogadorRepository jogadorRepository = new JogadorRepository();
 
@@ -25,6 +28,8 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
     private String dicaAtual = "";
     private String autorDicaAtual = "";
+    private int acertosNaRodada = 0;
+    private boolean bonusDicaConcedidoNaRodada = false;
 
     private final List<StreamObserver<ChatReply>> chatObservers = new CopyOnWriteArrayList<>();
 
@@ -82,6 +87,27 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void obterMeuObjeto(JogadorRequest request, StreamObserver<JogadorReply> responseObserver) {
+        Jogador jogador = jogadorRepository.buscar(request.getNick());
+
+        if (jogador == null) {
+            responseObserver.onNext(JogadorReply.newBuilder()
+                    .setSucesso(false)
+                    .setMessage("Jogador não encontrado.")
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        responseObserver.onNext(JogadorReply.newBuilder()
+                .setSucesso(true)
+                .setMessage("Objeto atual.")
+                .setObjeto(jogador.getObjeto().getNomeObjeto())
+                .build());
+        responseObserver.onCompleted();
+    }
+
     // -----------------------------------------------------------------------
     // receberDicas
     // -----------------------------------------------------------------------
@@ -135,6 +161,8 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
         dicaAtual = dica;
         autorDicaAtual = autor;
+        acertosNaRodada = 0;
+        bonusDicaConcedidoNaRodada = false;
 
         notificarTodos(DicaReply.newBuilder()
                 .setMessage("Dica de " + autor + ": " + dica)
@@ -146,6 +174,11 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         notificarTodos(DicaReply.newBuilder()
                 .setMessage("Adivinhe o objeto de " + jogadorAtual + "!")
                 .build());
+
+        responseObserver.onNext(DicaReply.newBuilder()
+                .setMessage("Dica enviada.")
+                .build());
+        responseObserver.onCompleted();
     }
 
     // -----------------------------------------------------------------------
@@ -161,6 +194,15 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Não é hora de adivinhar.")
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        if (jogadorTentando == null) {
+            responseObserver.onNext(AdivinharReply.newBuilder()
+                    .setAcertou(false)
+                    .setMessage("Jogador não encontrado.")
                     .build());
             responseObserver.onCompleted();
             return;
@@ -184,23 +226,39 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
+        if (jogadorTentando.isTentouAdvinhar()) {
+            responseObserver.onNext(AdivinharReply.newBuilder()
+                    .setAcertou(false)
+                    .setMessage("Você já tentou nesta rodada.")
+                    .setPontuacaoAtualizada(jogadorTentando.getPontos())
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
         boolean acertou = request.getObjeto().equalsIgnoreCase(jogadorAlvo.getObjeto().getNomeObjeto());
         jogadorTentando.setTentouAdvinhar(true);
 
         int pontuacaoAtualizada = jogadorTentando.getPontos();
 
         if (acertou) {
-            pontuacaoAtualizada = jogadorTentando.getPontos() + PONTOS_ACERTO;
+            acertosNaRodada++;
+            int pontosAcerto = calcularPontosAcerto();
+            pontuacaoAtualizada = jogadorTentando.getPontos() + pontosAcerto;
             jogadorTentando.setPontos(pontuacaoAtualizada);
 
             notificarTodos(DicaReply.newBuilder()
-                    .setMessage(request.getJogador() + " acertou! +" + PONTOS_ACERTO + " pt")
+                    .setMessage(request.getJogador() + " acertou! +" + pontosAcerto + " pts")
                     .build());
 
-            rodadaAtual++;
-            dicaAtual = "";
-            autorDicaAtual = "";
-            iniciarVez();
+            if (!bonusDicaConcedidoNaRodada) {
+                jogadorAlvo.setPontos(jogadorAlvo.getPontos() + PONTOS_BONUS_DICA);
+                bonusDicaConcedidoNaRodada = true;
+
+                notificarTodos(DicaReply.newBuilder()
+                        .setMessage(jogadorAlvo.getNick() + " ganhou +" + PONTOS_BONUS_DICA + " pts pela dica")
+                        .build());
+            }
 
         } else {
             // Regra: erro não remove pontos, apenas não ganha
@@ -209,15 +267,36 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                     .build());
 
             if (jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
+                String mensagemFimRodada = acertosNaRodada == 0
+                        ? "Ninguém acertou. Próxima rodada!"
+                        : "Rodada encerrada.";
+
                 notificarTodos(DicaReply.newBuilder()
-                        .setMessage("Ninguém acertou. Próxima rodada!")
+                        .setMessage(mensagemFimRodada)
                         .build());
 
+                renovarObjetoSeFoiAcertado(jogadorAlvo);
                 rodadaAtual++;
                 dicaAtual = "";
                 autorDicaAtual = "";
+                acertosNaRodada = 0;
+                bonusDicaConcedidoNaRodada = false;
                 iniciarVez();
             }
+        }
+
+        if (acertou && jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
+            notificarTodos(DicaReply.newBuilder()
+                    .setMessage("Rodada encerrada.")
+                    .build());
+
+            renovarObjetoSeFoiAcertado(jogadorAlvo);
+            rodadaAtual++;
+            dicaAtual = "";
+            autorDicaAtual = "";
+            acertosNaRodada = 0;
+            bonusDicaConcedidoNaRodada = false;
+            iniciarVez();
         }
 
         responseObserver.onNext(AdivinharReply.newBuilder()
@@ -335,6 +414,8 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
         jogadorAtual = dono.getNick();
         estadoJogo = EstadoJogo.ESPERANDO_DICA;
+        acertosNaRodada = 0;
+        bonusDicaConcedidoNaRodada = false;
 
         notificarTodos(DicaReply.newBuilder()
                 .setMessage("Turno de " + jogadorAtual + " — Rodada " + rodadaAtual)
@@ -356,5 +437,26 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     private String horarioAtual() {
         java.time.LocalTime agora = java.time.LocalTime.now();
         return String.format("%02d:%02d", agora.getHour(), agora.getMinute());
+    }
+
+    private void renovarObjetoSeFoiAcertado(Jogador jogadorAlvo) {
+        if (acertosNaRodada == 0) return;
+
+        String novoObjeto = jogadorRepository.sortearNovoObjeto(jogadorAlvo.getNick());
+        if (novoObjeto == null) return;
+
+        notificarTodos(DicaReply.newBuilder()
+                .setMessage(jogadorAlvo.getNick() + " receberá um novo objeto.")
+                .build());
+    }
+
+    private int calcularPontosAcerto() {
+        if (acertosNaRodada == 1) {
+            return PONTOS_PRIMEIRO_ACERTO;
+        }
+        if (acertosNaRodada == 2) {
+            return PONTOS_SEGUNDO_ACERTO;
+        }
+        return PONTOS_DEMAIS_ACERTOS;
     }
 }

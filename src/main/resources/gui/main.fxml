@@ -106,7 +106,8 @@
          <!-- Painel de espera -->
          <VBox fx:id="painelEspera" alignment="CENTER" spacing="10.0" visible="true">
             <Label text="&#9203;" style="-fx-font-size: 48px;" />
-            <Label text="Aguardando o jogo iniciar..."
+            <Label fx:id="esperaLabel"
+                   text="Aguardando o jogo iniciar..."
                    style="-fx-font-size: 16px; -fx-text-fill: #a0aec0;" />
          </VBox>
 

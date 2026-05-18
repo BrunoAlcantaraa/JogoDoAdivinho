@@ -4,7 +4,9 @@ import com.bruno.grpc.EstadoReply;
 import com.bruno.grpc.JogadorInfo;
 import javafx.application.Platform;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 
@@ -30,6 +32,7 @@ public class GameStatePoller {
 
     private EstadoReply ultimoEstado = null;
     private int ultimoTamanhoLista = -1;
+    private Map<String, Integer> ultimasPontuacoes = new HashMap<>();
     private volatile boolean rodando = false;
 
     public GameStatePoller(GrpcGameClient client, BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou) {
@@ -59,6 +62,7 @@ public class GameStatePoller {
                 if (estadoMudou || listaMudou) {
                     ultimoEstado = estado;
                     ultimoTamanhoLista = jogadores.size();
+                    ultimasPontuacoes = criarSnapshotPontuacoes(jogadores);
                     Platform.runLater(() -> onEstadoMudou.accept(estado, jogadores));
                 }
             } catch (Exception e) {
@@ -68,9 +72,15 @@ public class GameStatePoller {
     }
 
     private boolean pontuacoesMudaram(List<JogadorInfo> jogadores) {
-        // Detecta mudança somando os pontos — simples e eficiente para polling
-        if (ultimoEstado == null) return true;
-        return false; // pontuações são comparadas indiretamente pelo estado do servidor
+        return !ultimasPontuacoes.equals(criarSnapshotPontuacoes(jogadores));
+    }
+
+    private Map<String, Integer> criarSnapshotPontuacoes(List<JogadorInfo> jogadores) {
+        Map<String, Integer> snapshot = new HashMap<>();
+        for (JogadorInfo jogador : jogadores) {
+            snapshot.put(jogador.getNick(), jogador.getPontos());
+        }
+        return snapshot;
     }
 
     /** Para o polling. */
