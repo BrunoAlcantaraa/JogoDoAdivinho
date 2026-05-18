@@ -85,7 +85,7 @@ public class Cliente {
                 .setObjeto(objeto)
                 .build();
 
-        AdivinharReply response = blockingStub.adivinharNumero(request);
+        AdivinharReply response = blockingStub.adivinharObjeto(request);
         System.out.println(response.getMessage());
     }
 

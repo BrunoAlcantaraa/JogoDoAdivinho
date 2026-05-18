@@ -7,6 +7,7 @@ import io.grpc.stub.StreamObserver;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -99,17 +100,21 @@ public class GrpcGameClient {
                 .setAlvo(jogadorAlvo)
                 .setObjeto(objetoAdivinhar)
                 .build();
-        return blockingStub.adivinharNumero(req);
+        return blockingStub.adivinharObjeto(req);
+    }
+
+    /**
+     * Retorna a lista de jogadores com pontuação atual.
+     */
+    public List<JogadorInfo> listarJogadores() {
+        ListaJogadoresReply resp = blockingStub.listarJogadores(Empty.getDefaultInstance());
+        return resp.getJogadoresList();
     }
 
     // -----------------------------------------------------------------------
     // Chat gRPC
     // -----------------------------------------------------------------------
 
-    /**
-     * Abre o stream de recebimento de mensagens do chat.
-     * Deve ser chamado uma vez após o login, em background.
-     */
     public void receberMensagensChat(Consumer<ChatReply> onMensagem,
                                      Runnable onConcluido,
                                      Consumer<String> onErro) {
@@ -133,10 +138,6 @@ public class GrpcGameClient {
         });
     }
 
-    /**
-     * Envia uma mensagem de chat para todos os jogadores.
-     * Chamada bloqueante — use em background.
-     */
     public void enviarMensagemChat(String texto) {
         String horario = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
         ChatRequest req = ChatRequest.newBuilder()

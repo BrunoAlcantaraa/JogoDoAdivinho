@@ -10,7 +10,6 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
-<?import javafx.scene.shape.Rectangle?>
 <?import javafx.scene.text.Font?>
 
 <AnchorPane prefHeight="660.0" prefWidth="1000.0"
@@ -21,26 +20,27 @@
    <children>
 
       <!-- ============================================================ -->
-      <!-- PAINEL ESQUERDO: Jogadores + Ações                           -->
+      <!-- PAINEL ESQUERDO: Jogadores + Acoes                           -->
       <!-- ============================================================ -->
       <VBox layoutX="14.0" layoutY="14.0" prefWidth="200.0" spacing="8.0">
 
-         <!-- Cabeçalho Jogadores -->
+         <!-- Cabecalho Jogadores -->
          <Label text="Jogadores" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #2d3748;">
             <font><Font size="15.0" /></font>
          </Label>
 
-         <ListView fx:id="listJogadores" prefHeight="220.0" prefWidth="200.0"
-                   style="-fx-border-color: #cbd5e0; -fx-border-radius: 6; -fx-background-radius: 6; -fx-background-color: white;" />
+         <!-- Lista de jogadores com pontuacao -->
+         <ListView fx:id="listJogadores" prefHeight="240.0" prefWidth="200.0"
+                   style="-fx-border-color: #cbd5e0; -fx-border-radius: 6; -fx-background-radius: 6; -fx-background-color: white; -fx-font-size: 12px;" />
 
          <Separator style="-fx-padding: 2 0 2 0;" />
 
-         <!-- Botões de ação -->
+         <!-- Botoes de acao -->
          <Button fx:id="btnIniciarJogo"
                  mnemonicParsing="false"
                  onAction="#aoIniciarJogo"
                  prefHeight="34.0" prefWidth="200.0"
-                 text="▶  Iniciar Jogo"
+                 text="&#9654;  Iniciar Jogo"
                  disable="true"
                  style="-fx-background-color: #4299e1; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 6; -fx-cursor: hand;" />
 
@@ -48,7 +48,7 @@
                  mnemonicParsing="false"
                  onAction="#aoEnviarDica"
                  prefHeight="34.0" prefWidth="200.0"
-                 text="💡  Enviar Dica"
+                 text="Enviar Dica"
                  disable="true"
                  style="-fx-background-color: #48bb78; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 6; -fx-cursor: hand;" />
 
@@ -56,71 +56,69 @@
                  mnemonicParsing="false"
                  onAction="#aoAdivinhar"
                  prefHeight="34.0" prefWidth="200.0"
-                 text="🎯  Adivinhar"
+                 text="Adivinhar"
                  disable="true"
                  style="-fx-background-color: #ed8936; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 6; -fx-cursor: hand;" />
 
       </VBox>
 
       <!-- ============================================================ -->
-      <!-- ÁREA CENTRAL: Imagem/Dica + Status + Chat                    -->
+      <!-- AREA CENTRAL: Imagem/Dica + Status + Chat                    -->
       <!-- ============================================================ -->
 
-      <!-- Caixa da imagem / dica da rodada -->
       <StackPane fx:id="painelCentral"
                  layoutX="228.0" layoutY="14.0"
                  prefHeight="370.0" prefWidth="544.0"
                  style="-fx-background-color: white; -fx-background-radius: 10; -fx-border-color: #cbd5e0; -fx-border-radius: 10; -fx-effect: dropshadow(gaussian, #00000022, 8, 0, 0, 2);">
 
-         <!-- Imagem do objeto secreto (visível quando é a vez de dar dica) -->
          <ImageView fx:id="objetoImagem"
                     fitHeight="340.0" fitWidth="520.0"
                     pickOnBounds="true" preserveRatio="true"
                     visible="false" />
 
-         <!-- Painel de dica atual (visível quando outros adivinham) -->
+         <!-- Painel de dica atual -->
          <VBox fx:id="painelDica" alignment="CENTER" spacing="16.0"
                style="-fx-padding: 30;" visible="false">
-            <Label text="💬  Dica da rodada:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
+            <Label text="Dica da rodada:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
             <Label fx:id="dicaTextoLabel"
-                   text="—"
+                   text="&#8212;"
                    wrapText="true"
                    style="-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2d3748; -fx-text-alignment: center;" />
             <Label fx:id="dicaAutorLabel"
-                   text="por —"
+                   text="por &#8212;"
                    style="-fx-font-size: 14px; -fx-text-fill: #a0aec0; -fx-font-style: italic;" />
          </VBox>
 
-         <!-- Painel quando é a vez do jogador dar dica -->
+         <!-- Painel quando e a vez do jogador dar dica -->
          <VBox fx:id="painelSuaVez" alignment="CENTER" spacing="10.0"
                style="-fx-padding: 20;" visible="false">
-            <Label text="🎁  Seu objeto secreto:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
+            <Label text="Seu objeto secreto:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
             <ImageView fx:id="objetoImagemSuaVez"
                        fitHeight="220.0" fitWidth="400.0"
                        pickOnBounds="true" preserveRatio="true" />
             <Label fx:id="nomeObjetoSuaVezLabel"
-                   text="—"
+                   text="&#8212;"
                    style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #2d3748;" />
-            <Label text="Envie uma dica usando o botão à esquerda."
+            <Label text="Envie uma dica usando o botao a esquerda."
                    style="-fx-font-size: 12px; -fx-text-fill: #a0aec0;" />
          </VBox>
 
-         <!-- Painel de espera (antes do jogo iniciar) -->
+         <!-- Painel de espera -->
          <VBox fx:id="painelEspera" alignment="CENTER" spacing="10.0" visible="true">
-            <Label text="⏳" style="-fx-font-size: 48px;" />
+            <Label text="&#9203;" style="-fx-font-size: 48px;" />
             <Label text="Aguardando o jogo iniciar..."
                    style="-fx-font-size: 16px; -fx-text-fill: #a0aec0;" />
          </VBox>
 
       </StackPane>
 
-      <!-- Faixa de status abaixo da área central -->
+      <!-- Faixa de status abaixo da area central -->
       <HBox layoutX="228.0" layoutY="393.0" prefWidth="544.0" prefHeight="34.0"
             alignment="CENTER_LEFT" spacing="20.0"
             style="-fx-background-color: white; -fx-padding: 4 14 4 14; -fx-border-color: #cbd5e0; -fx-border-radius: 6; -fx-background-radius: 6;">
 
          <Label fx:id="objetoLabel"
-                text="Seu objeto: —"
+                text="Seu objeto: &#8212;"
                 style="-fx-font-size: 13px; -fx-text-fill: #4a5568;">
             <font><Font size="13.0" /></font>
          </Label>
@@ -128,7 +126,7 @@
          <Label text="|" style="-fx-text-fill: #cbd5e0;" />
 
          <Label fx:id="turnoJogadorLabel"
-                text="Vez de: —"
+                text="Vez de: &#8212;"
                 style="-fx-font-size: 13px; -fx-text-fill: #4a5568;">
             <font><Font size="13.0" /></font>
          </Label>
@@ -159,32 +157,31 @@
       </HBox>
 
       <!-- ============================================================ -->
-      <!-- PAINEL DIREITO: Jogador local + Rodada                       -->
+      <!-- PAINEL DIREITO: Jogador local + Rodada + Notificacoes        -->
       <!-- ============================================================ -->
       <VBox layoutX="786.0" layoutY="14.0" prefWidth="200.0" spacing="8.0">
 
          <Label fx:id="turnoLabel"
-                text="Rodada —"
+                text="Rodada &#8212;"
                 style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2d3748;">
             <font><Font size="18.0" /></font>
          </Label>
 
          <Label fx:id="jogadorLabel"
-                text="Jogador: —"
+                text="Jogador: &#8212;"
                 style="-fx-font-size: 13px; -fx-text-fill: #4a5568;">
             <font><Font size="13.0" /></font>
          </Label>
 
          <Label fx:id="pontuacaoLabel"
-                text="Pontuação: 0"
-                style="-fx-font-size: 13px; -fx-text-fill: #4a5568;">
+                text="Pontuacao: 0"
+                style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2d3748;">
             <font><Font size="13.0" /></font>
          </Label>
 
          <Separator style="-fx-padding: 4 0 4 0;" />
 
-         <!-- Mini-log do servidor (dicas do stream) -->
-         <Label text="Notificações"
+         <Label text="Notificacoes"
                 style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #4a5568;" />
 
          <ListView fx:id="listNotificacoes"

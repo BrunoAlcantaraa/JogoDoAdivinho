@@ -1,9 +1,10 @@
 package com.bruno.grpc.view;
 
+import com.bruno.grpc.AdivinharReply;
 import com.bruno.grpc.ChatReply;
 import com.bruno.grpc.EstadoJogo;
 import com.bruno.grpc.EstadoReply;
-import com.bruno.grpc.AdivinharReply;
+import com.bruno.grpc.JogadorInfo;
 import com.bruno.grpc.view.client.GrpcGameClient;
 import com.bruno.grpc.view.client.GameStatePoller;
 import com.bruno.grpc.view.entities.Mensagem;
@@ -16,6 +17,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -53,8 +55,8 @@ public class Controller {
     @FXML private VBox painelDica;
 
     // Imagem e labels da área central
-    @FXML private ImageView objetoImagem;           // (reservado, mantido para compatibilidade)
-    @FXML private ImageView objetoImagemSuaVez;    // imagem no painel "sua vez"
+    @FXML private ImageView objetoImagem;
+    @FXML private ImageView objetoImagemSuaVez;
     @FXML private Label nomeObjetoSuaVezLabel;
     @FXML private Label dicaTextoLabel;
     @FXML private Label dicaAutorLabel;
@@ -86,6 +88,8 @@ public class Controller {
     private String jogadorAtualNoServidor = "";
     private boolean jaAdivinhouNessaRodada = false;
     private String alvoTentadoNessaRodada = "";
+    // Controle de limpeza de notificações por rodada
+    private int ultimaRodadaNotificada = -1;
 
     // -----------------------------------------------------------------------
     // Inicialização
@@ -133,26 +137,25 @@ public class Controller {
         objetoLabel.setText("Seu objeto: " + objeto);
 
         adicionarNotificacao(mensagemServidor);
-        adicionarNotificacao("Seu objeto secreto é: " + objeto);
+        adicionarNotificacao("Seu objeto: " + objeto);
 
-        // Carrega a imagem do objeto do jogador local
         carregarImagemObjeto(objeto);
 
         // Abre stream de dicas (notificações do servidor)
         bgExecutor.submit(() -> grpcClient.receberDicas(
                 msg -> Platform.runLater(() -> adicionarNotificacao(msg)),
-                () -> Platform.runLater(() -> adicionarNotificacao("[Sistema] Stream encerrado.")),
-                erro -> Platform.runLater(() -> adicionarNotificacao("[Erro] " + erro))
+                () -> Platform.runLater(() -> adicionarNotificacao("Stream encerrado.")),
+                erro -> Platform.runLater(() -> adicionarNotificacao("Erro: " + erro))
         ));
 
         // Abre stream do chat gRPC
         bgExecutor.submit(() -> grpcClient.receberMensagensChat(
                 chatMsg -> Platform.runLater(() -> adicionarMensagemChat(chatMsg)),
-                () -> Platform.runLater(() -> adicionarNotificacao("[Chat] Stream de chat encerrado.")),
-                erro -> Platform.runLater(() -> adicionarNotificacao("[Chat] " + erro))
+                () -> Platform.runLater(() -> adicionarNotificacao("Chat encerrado.")),
+                erro -> Platform.runLater(() -> adicionarNotificacao("Chat: " + erro))
         ));
 
-        // Inicia polling de estado
+        // Inicia polling de estado + lista de jogadores
         statePoller = new GameStatePoller(grpcClient, this::aoEstadoMudar);
         statePoller.iniciar();
     }
@@ -161,7 +164,7 @@ public class Controller {
     // Reação a mudanças de estado
     // -----------------------------------------------------------------------
 
-    private void aoEstadoMudar(EstadoReply estado) {
+    private void aoEstadoMudar(EstadoReply estado, List<JogadorInfo> jogadores) {
         estadoAtual = estado.getEstado();
         jogadorAtualNoServidor = estado.getJogadorAtual();
         int rodada = estado.getRodada();
@@ -170,10 +173,27 @@ public class Controller {
         turnoLabel.setText(rodada > 0 ? "Rodada " + rodada : "Rodada —");
         turnoJogadorLabel.setText("Vez de: " + (jogadorAtualNoServidor.isEmpty() ? "—" : jogadorAtualNoServidor));
 
+        // Atualiza lista de jogadores com pontuação
+        atualizarListaJogadores(jogadores, meuNick);
+
+        // Atualiza pontuação própria a partir da lista
+        for (JogadorInfo ji : jogadores) {
+            if (ji.getNick().equals(meuNick)) {
+                pontuacaoLabel.setText("Pontuação: " + ji.getPontos());
+                break;
+            }
+        }
+
         // Reseta flag de "já tentou adivinhar" quando o alvo muda
         if (!alvoTentadoNessaRodada.equals(jogadorAtualNoServidor)) {
             jaAdivinhouNessaRodada = false;
             alvoTentadoNessaRodada = jogadorAtualNoServidor;
+        }
+
+        // Limpa notificações da rodada anterior ao iniciar nova rodada
+        if (rodada > 0 && rodada != ultimaRodadaNotificada) {
+            ultimaRodadaNotificada = rodada;
+            limparNotificacoesDaRodada();
         }
 
         switch (estadoAtual) {
@@ -196,11 +216,9 @@ public class Controller {
                 btnAdivinhar.setDisable(true);
 
                 if (minhaVez) {
-                    // É minha vez: mostrar imagem + nome do meu objeto
                     atualizarPainelSuaVez();
                     mostrarPainel(painelSuaVez);
                 } else {
-                    // Outro jogador vai dar dica
                     mostrarPainel(painelEspera);
                 }
             }
@@ -211,7 +229,6 @@ public class Controller {
                 boolean possoAdivinhar = !meuNick.equals(jogadorAtualNoServidor) && !jaAdivinhouNessaRodada;
                 btnAdivinhar.setDisable(!possoAdivinhar);
 
-                // Mostra a dica atual no centro
                 String dica = estado.getDicaAtual();
                 String autor = estado.getAutorDicaAtual();
                 if (!dica.isEmpty()) {
@@ -222,6 +239,35 @@ public class Controller {
                     mostrarPainel(painelEspera);
                 }
             }
+        }
+    }
+
+    /**
+     * Atualiza a ListView de jogadores com nick e pontuação.
+     * Destaca o jogador local com " (você)".
+     */
+    private void atualizarListaJogadores(List<JogadorInfo> jogadores, String meuNick) {
+        listJogadores.getItems().clear();
+        for (JogadorInfo ji : jogadores) {
+            String entrada = ji.getNick() + " — " + ji.getPontos() + " pts";
+            if (ji.getNick().equals(meuNick)) {
+                entrada += " (você)";
+            }
+            listJogadores.getItems().add(entrada);
+        }
+    }
+
+    /**
+     * Remove notificações de rodada (que começam com "Turno de" ou "Rodada")
+     * para não poluir a tela entre rodadas. Mensagens do stream de dicas
+     * (erros, acertos) da rodada anterior são limpas; o chat permanece intacto.
+     */
+    private void limparNotificacoesDaRodada() {
+        // Remove as notificações de sistema mais antigas, mantendo as últimas 5
+        // para contexto. Isso evita tela poluída sem apagar tudo abruptamente.
+        var items = listNotificacoes.getItems();
+        while (items.size() > 5) {
+            items.remove(0);
         }
     }
 
@@ -236,7 +282,7 @@ public class Controller {
         bgExecutor.submit(() -> {
             try {
                 String msg = grpcClient.iniciarJogo();
-                Platform.runLater(() -> adicionarNotificacao("[Servidor] " + msg));
+                Platform.runLater(() -> adicionarNotificacao(msg));
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     mostrarAlerta("Erro", "Falha ao iniciar jogo", e.getMessage());
@@ -266,7 +312,7 @@ public class Controller {
         bgExecutor.submit(() -> {
             try {
                 String msg = grpcClient.enviarDica(dica);
-                Platform.runLater(() -> adicionarNotificacao("[Servidor] " + msg));
+                Platform.runLater(() -> adicionarNotificacao(msg));
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     mostrarAlerta("Erro", "Falha ao enviar dica", e.getMessage());
@@ -300,8 +346,9 @@ public class Controller {
             try {
                 AdivinharReply resp = grpcClient.adivinharObjeto(alvo, objeto);
                 Platform.runLater(() -> {
-                    adicionarNotificacao("[Servidor] " + resp.getMessage());
+                    adicionarNotificacao(resp.getMessage());
                     if (resp.getAcertou()) {
+                        pontuacaoLabel.setText("Pontuação: " + resp.getPontuacaoAtualizada());
                         mostrarInfo("Acertou!", "Parabéns!", "Você acertou o objeto de " + alvo + "!");
                     }
                 });
@@ -314,7 +361,6 @@ public class Controller {
         });
     }
 
-    /** Envia mensagem no chat via gRPC. */
     @FXML
     private void aoEnviarMSG() {
         String texto = campoMensagem.getText();
@@ -329,7 +375,7 @@ public class Controller {
             try {
                 grpcClient.enviarMensagemChat(mensagem);
             } catch (Exception e) {
-                Platform.runLater(() -> adicionarNotificacao("[Chat] Erro ao enviar mensagem: " + e.getMessage()));
+                Platform.runLater(() -> adicionarNotificacao("Chat: erro ao enviar."));
             }
         });
     }
@@ -338,7 +384,6 @@ public class Controller {
     // Utilitários de UI
     // -----------------------------------------------------------------------
 
-    /** Exibe apenas o sub-painel informado na área central. */
     private void mostrarPainel(VBox painel) {
         painelEspera.setVisible(false);
         painelSuaVez.setVisible(false);
@@ -346,7 +391,6 @@ public class Controller {
         painel.setVisible(true);
     }
 
-    /** Atualiza a imagem e o nome do objeto no painel "sua vez". */
     private void atualizarPainelSuaVez() {
         String objeto = grpcClient != null ? grpcClient.getObjeto() : null;
         if (objeto == null) return;
@@ -363,7 +407,6 @@ public class Controller {
         }
     }
 
-    /** Carrega a imagem do objeto para uso futuro no painelSuaVez. */
     private void carregarImagemObjeto(String nomeObjeto) {
         try {
             String caminhoImagem = "/img/" + nomeObjeto + ".png";
@@ -376,16 +419,13 @@ public class Controller {
         }
     }
 
-    /** Adiciona uma mensagem recebida pelo stream do chat. */
     private void adicionarMensagemChat(ChatReply chatMsg) {
-        // Exibe como "[HH:MM] nick - texto"
         Mensagem m = new Mensagem(chatMsg.getTexto(), chatMsg.getNick(), LocalDateTime.now());
         listMensagens.getItems().add(m);
         int ultimo = listMensagens.getItems().size() - 1;
         if (ultimo >= 0) listMensagens.scrollTo(ultimo);
     }
 
-    /** Adiciona notificação do servidor na lista de notificações (direita). */
     private void adicionarNotificacao(String texto) {
         listNotificacoes.getItems().add(texto);
         int ultimo = listNotificacoes.getItems().size() - 1;
