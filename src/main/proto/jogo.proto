@@ -23,7 +23,7 @@ service Controller {
   rpc receberDicas(JogadorRequest) returns (stream DicaReply);
 
   // Tentativa de adivinhar
-  rpc advinharNumero(AdvinharRequest) returns (AdvinharReply);
+  rpc adivinharNumero(AdivinharRequest) returns (AdivinharReply);
 }
 
 enum EstadoJogo {
@@ -39,7 +39,7 @@ message JogadorRequest {
 message JogadorReply {
   bool sucesso = 1;
   string message = 2;
-  int32 numero = 3;
+  string objeto = 3;
 }
 
 message EstadoReply {
@@ -58,13 +58,13 @@ message DicaReply {
   string message = 1;
 }
 
-message AdvinharRequest {
+message AdivinharRequest {
   string jogador = 1;
   string alvo = 2;
-  int32 numero = 3;
+  string objeto = 3;
 }
 
-message AdvinharReply {
+message AdivinharReply {
   bool acertou = 1;
   string message = 2;
 }

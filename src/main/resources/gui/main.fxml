@@ -12,7 +12,7 @@
 <AnchorPane prefHeight="641.0" prefWidth="979.0"
             xmlns="http://javafx.com/javafx/17"
             xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.bruno.grpc.view.HelloController">
+            fx:controller="com.bruno.grpc.view.Controller">
    <children>
 
       <!-- Área central: imagem do objeto -->

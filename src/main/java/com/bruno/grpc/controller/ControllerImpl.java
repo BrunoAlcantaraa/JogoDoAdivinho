@@ -9,9 +9,7 @@ import io.grpc.stub.StreamObserver;
 
 public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
-    private final int QTD_NUMEROS = 100;
-
-    private final JogadorRepository jogadorRepository = new JogadorRepository(QTD_NUMEROS);
+    private final JogadorRepository jogadorRepository = new JogadorRepository();
 
     private String jogadorAtual = "";
     private String jogadorInicial = "";
@@ -31,11 +29,11 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             }
         }
 
-        int numSorteado = jogadorRepository.adicionar(nick);
+        String objeto = jogadorRepository.adicionar(nick);
 
         JogadorReply resposta;
 
-        if (numSorteado == -1) {
+        if (objeto == null) {
             resposta = JogadorReply.newBuilder()
                     .setSucesso(false)
                     .setMessage("Esse nick já está em uso!")
@@ -44,7 +42,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             resposta = JogadorReply.newBuilder()
                     .setSucesso(true)
                     .setMessage("Jogador " + nick + " conectado com sucesso!")
-                    .setNumero(numSorteado)
+                    .setObjeto(objeto)
                     .build();
         }
 
@@ -119,13 +117,13 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     }
 
     @Override
-    public synchronized void advinharNumero(AdvinharRequest request, StreamObserver<AdvinharReply> responseObserver) {
+    public synchronized void adivinharNumero(AdivinharRequest request, StreamObserver<AdivinharReply> responseObserver) {
 
         Jogador jogadorTentandoAdvinhar = jogadorRepository.buscar(request.getJogador());
         Jogador jogadorAlvo = jogadorRepository.buscar(jogadorAtual);
 
         if (estadoJogo != EstadoJogo.ESPERANDO_ADVINHAR) {
-            responseObserver.onNext(AdvinharReply.newBuilder()
+            responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Agora não é o momento de adivinhar.")
                     .build());
@@ -134,7 +132,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
 
         if (request.getJogador().equals(jogadorAtual)) {
-            responseObserver.onNext(AdvinharReply.newBuilder()
+            responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Você não pode tentar adivinhar o próprio número.")
                     .build());
@@ -143,7 +141,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
 
         if (jogadorAlvo == null) {
-            responseObserver.onNext(AdvinharReply.newBuilder()
+            responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Jogador da vez não encontrado.")
                     .build());
@@ -151,8 +149,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
-        boolean acertou = request.getNumero() == jogadorAlvo.getNumero();
-
+        boolean acertou = request.getObjeto().equalsIgnoreCase(jogadorAlvo.getObjeto().getNomeObjeto());
         jogadorTentandoAdvinhar.setTentouAdvinhar(true);
 
         if (acertou) {
@@ -167,7 +164,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         } else {
             notificarTodos(DicaReply.newBuilder()
                     .setMessage("[Servidor] " + request.getJogador()
-                            + " tentou " + request.getNumero() + " e errou.")
+                            + " tentou " + request.getObjeto() + " e errou.")
                     .build());
 
             if (jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
@@ -180,7 +177,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             }
         }
 
-        responseObserver.onNext(AdvinharReply.newBuilder()
+        responseObserver.onNext(AdivinharReply.newBuilder()
                 .setAcertou(acertou)
                 .setMessage(acertou ? "Acertou!" : "Errou!")
                 .build());

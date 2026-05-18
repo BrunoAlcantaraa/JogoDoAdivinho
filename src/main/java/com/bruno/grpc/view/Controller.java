@@ -2,7 +2,7 @@ package com.bruno.grpc.view;
 
 import com.bruno.grpc.EstadoJogo;
 import com.bruno.grpc.EstadoReply;
-import com.bruno.grpc.AdvinharReply;
+import com.bruno.grpc.AdivinharReply;
 import com.bruno.grpc.view.client.GrpcGameClient;
 import com.bruno.grpc.view.client.GameStatePoller;
 import com.bruno.grpc.view.entities.Mensagem;
@@ -18,21 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Controller da tela principal do jogo.
- *
- * Responsabilidades:
- *   - Gerenciar o ciclo de vida da conexão gRPC (via GrpcGameClient)
- *   - Reagir a mudanças de estado vindas do GameStatePoller
- *   - Receber mensagens do stream receberDicas e exibi-las no ListView
- *   - Habilitar/desabilitar botões conforme o estado do jogo e turno do jogador
- *   - Nunca bloquear a thread JavaFX: chamadas de rede rodam em executor de background
- */
-public class HelloController {
-
-    // -----------------------------------------------------------------------
-    // FXML bindings
-    // -----------------------------------------------------------------------
+public class Controller {
 
     @FXML private ListView<Mensagem> listMensagens;
     @FXML private TextField campoMensagem;
@@ -71,7 +57,7 @@ public class HelloController {
 
     private EstadoJogo estadoAtual = EstadoJogo.ESPERANDO_INICIAR_JOGO;
     private String jogadorAtualNoServidor = "";
-    private boolean jaAdinvinhouNessaRodada = false;
+    private boolean jaAdivinhouNessaRodada = false;
     private String alvoTentadoNessaRodada = "";
 
     // -----------------------------------------------------------------------
@@ -112,7 +98,7 @@ public class HelloController {
         bgExecutor.submit(() -> {
             grpcClient.entrar(
                     nick,
-                    (n, numero, msg) -> Platform.runLater(() -> aoEntrarComSucesso(n, numero, msg)),
+                    (n, objeto, msg) -> Platform.runLater(() -> aoEntrarComSucesso(n, objeto, msg)),
                     erro -> Platform.runLater(() -> {
                         mostrarAlerta("Erro ao entrar", "Não foi possível entrar no jogo", erro);
                         solicitarLogin();
@@ -122,14 +108,14 @@ public class HelloController {
     }
 
     /** Chamado na thread JavaFX após entrar com sucesso. */
-    private void aoEntrarComSucesso(String nick, int meuNumero, String mensagemServidor) {
+    private void aoEntrarComSucesso(String nick, String objeto, String mensagemServidor) {
         // Atualiza labels com dados do jogador
         jogadorLabel.setText("Jogador: " + nick);
         pontuacaoLabel.setText("Pontuação: 0");
-        objetoLabel.setText("Seu número: " + meuNumero);
+        objetoLabel.setText("Seu número: " + objeto);
 
         adicionarMensagemSistema(mensagemServidor);
-        adicionarMensagemSistema("Seu número secreto é: " + meuNumero + " — não conta para ninguém!");
+        adicionarMensagemSistema("Seu Objeto secreto é: " + objeto);
 
         // Abre o stream de dicas em background
         bgExecutor.submit(() -> grpcClient.receberDicas(
@@ -160,7 +146,7 @@ public class HelloController {
 
         // Reseta flag de "já tentou adivinhar" quando o alvo muda
         if (!alvoTentadoNessaRodada.equals(jogadorAtualNoServidor)) {
-            jaAdinvinhouNessaRodada = false;
+            jaAdivinhouNessaRodada = false;
             alvoTentadoNessaRodada = jogadorAtualNoServidor;
         }
 
@@ -185,7 +171,7 @@ public class HelloController {
             case ESPERANDO_ADVINHAR -> {
                 btnIniciarJogo.setDisable(true);
                 btnEnviarDica.setDisable(true);
-                boolean possoAdivinhar = !meuNick.equals(jogadorAtualNoServidor) && !jaAdinvinhouNessaRodada;
+                boolean possoAdivinhar = !meuNick.equals(jogadorAtualNoServidor) && !jaAdivinhouNessaRodada;
                 btnAdivinhar.setDisable(!possoAdivinhar);
             }
         }
@@ -258,23 +244,17 @@ public class HelloController {
         Optional<String> resultado = dialog.showAndWait();
         if (resultado.isEmpty() || resultado.get().trim().isEmpty()) return;
 
-        int numero;
-        try {
-            numero = Integer.parseInt(resultado.get().trim());
-        } catch (NumberFormatException e) {
-            mostrarAlerta("Erro", "Número inválido", "Digite apenas números inteiros.");
-            return;
-        }
+        String objeto = resultado.get().trim();
 
         btnAdivinhar.setDisable(true);
-        jaAdinvinhouNessaRodada = true;
+        jaAdivinhouNessaRodada = true;
 
         final String alvo = jogadorAtualNoServidor;
-        final int numFinal = numero;
+        final String objetoFinal = objeto;
 
         bgExecutor.submit(() -> {
             try {
-                AdvinharReply resp = grpcClient.advinharNumero(alvo, numFinal);
+                AdivinharReply resp = grpcClient.adivinharObjeto(alvo, objetoFinal);
                 Platform.runLater(() -> {
                     adicionarMensagemSistema("[Servidor] " + resp.getMessage());
                     if (resp.getAcertou()) {
@@ -283,7 +263,7 @@ public class HelloController {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    jaAdinvinhouNessaRodada = false;
+                    jaAdivinhouNessaRodada = false;
                     mostrarAlerta("Erro", "Falha ao adivinhar", e.getMessage());
                 });
             }
@@ -321,7 +301,7 @@ public class HelloController {
     private void carregarImagemPadrao() {
         try {
             Image img = new Image(Objects.requireNonNull(
-                    getClass().getResourceAsStream("/img/oldspice.png")));
+                    getClass().getResourceAsStream("")));
             if (objetoImagem != null) objetoImagem.setImage(img);
         } catch (Exception e) {
             // Imagem não encontrada — ignora silenciosamente

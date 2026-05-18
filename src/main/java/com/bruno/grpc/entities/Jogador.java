@@ -1,28 +1,25 @@
 package com.bruno.grpc.entities;
 
 import com.bruno.grpc.DicaReply;
+import com.bruno.grpc.view.entities.ImagemObjeto;
 import io.grpc.stub.StreamObserver;
 
 public class Jogador {
 
     private String nick;
-    private int numero;
+    private ImagemObjeto objeto;
     private int pontos;
     private StreamObserver<DicaReply> observer;
     private boolean tentouAdvinhar = false;
 
-    public Jogador(String nick, int numero, StreamObserver<DicaReply> observer) {
+    public Jogador(String nick, ImagemObjeto objeto, StreamObserver<DicaReply> observer) {
         this.nick = nick;
-        this.numero = numero;
+        this.objeto = objeto;
         this.observer = observer;
     }
 
     public String getNick() {
         return nick;
-    }
-
-    public int getNumero() {
-        return numero;
     }
 
     public int getPontos() {
@@ -45,16 +42,22 @@ public class Jogador {
         return observer;
     }
 
-    /**
-     * Vincula o observer ao jogador após ele se inscrever no stream receberDicas().
-     */
+    public void setNick(String nick) {
+        this.nick = nick;
+    }
+
+    public ImagemObjeto getObjeto() {
+        return objeto;
+    }
+
+    public void setObjeto(ImagemObjeto objeto) {
+        this.objeto = objeto;
+    }
+
     public void setObserver(StreamObserver<DicaReply> observer) {
         this.observer = observer;
     }
 
-    /**
-     * Indica se o jogador já abriu seu stream de dicas.
-     */
     public boolean isConectado() {
         return observer != null;
     }

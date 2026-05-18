@@ -33,7 +33,7 @@ public class Cliente {
         System.out.println(response.getMessage());
 
         if (response.getSucesso()) {
-            System.out.println("Seu número: " + response.getNumero());
+            System.out.println("Seu objeto: " + response.getObjeto());
             return true;
         }
 
@@ -74,25 +74,18 @@ public class Cliente {
         });
     }
 
-    public void tentarAdvinhar(String alvo, Scanner scanner) {
+    public void tentarAdivinhar(String alvo, Scanner scanner) {
         System.out.print("> Tente adivinhar o número de " + alvo + ": ");
 
-        int numero;
+        String objeto = scanner.nextLine();
 
-        try {
-            numero = Integer.parseInt(scanner.nextLine());
-        } catch (NumberFormatException e) {
-            System.out.println("Digite um número válido.");
-            return;
-        }
-
-        AdvinharRequest request = AdvinharRequest.newBuilder()
+        AdivinharRequest request = AdivinharRequest.newBuilder()
                 .setJogador(nick)
                 .setAlvo(alvo)
-                .setNumero(numero)
+                .setObjeto(objeto)
                 .build();
 
-        AdvinharReply response = blockingStub.advinharNumero(request);
+        AdivinharReply response = blockingStub.adivinharNumero(request);
         System.out.println(response.getMessage());
     }
 
@@ -138,7 +131,7 @@ public class Cliente {
                     if (!estadoReply.getJogadorAtual().equals(nick)) {
 
                         if (!ultimoAlvoTentado.equals(estadoReply.getJogadorAtual())) {
-                            tentarAdvinhar(estadoReply.getJogadorAtual(), scanner);
+                            tentarAdivinhar(estadoReply.getJogadorAtual(), scanner);
                             ultimoAlvoTentado = estadoReply.getJogadorAtual();
                         } else {
                             System.out.println("Você já tentou nessa rodada. Aguardando...");

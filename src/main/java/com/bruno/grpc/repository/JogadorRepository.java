@@ -2,34 +2,31 @@ package com.bruno.grpc.repository;
 
 import com.bruno.grpc.DicaReply;
 import com.bruno.grpc.entities.Jogador;
+import com.bruno.grpc.view.entities.ImagemObjeto;
+import com.bruno.grpc.view.util.ImagemGerenciador;
 import io.grpc.stub.StreamObserver;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class JogadorRepository {
 
-    private final int qtdNumeros;
-
     private final Map<String, Jogador> jogadores = new ConcurrentHashMap<>();
 
-    public JogadorRepository(int qtdNumeros) {
-        this.qtdNumeros = qtdNumeros;
+    public JogadorRepository() {
     }
 
-    public int adicionar(String nick) {
-        if (jogadores.containsKey(nick)) return -1;
+    public String adicionar(String nick) {
+        if (jogadores.containsKey(nick)) return null;
 
-        Random random = new Random();
-        int numeroSorteado = random.nextInt(qtdNumeros) + 1;
+        ImagemObjeto imagem = ImagemGerenciador.getImagemAleatoria();
 
         // Cria o Jogador sem observer por enquanto (será vinculado em receberDicas)
-        Jogador jogador = new Jogador(nick, numeroSorteado, null);
+        Jogador jogador = new Jogador(nick, imagem, null);
         jogadores.put(nick, jogador);
 
-        return numeroSorteado;
+        return imagem.getNomeObjeto();
     }
 
     public boolean todosTentaramAdvinhar(String dono) {

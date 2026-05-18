@@ -23,7 +23,7 @@ public class GrpcGameClient {
     private final ControllerGrpc.ControllerStub asyncStub;
 
     private String nick;
-    private int meuNumero;
+    private String objeto;
 
     public GrpcGameClient() {
         channel = Grpc.newChannelBuilderForAddress(HOST, PORT, InsecureChannelCredentials.create()).build();
@@ -31,17 +31,6 @@ public class GrpcGameClient {
         asyncStub = ControllerGrpc.newStub(channel);
     }
 
-    // -----------------------------------------------------------------------
-    // entrar
-    // -----------------------------------------------------------------------
-
-    /**
-     * Entra no jogo com o nick fornecido.
-     *
-     * @param nick     nick desejado
-     * @param onSucesso callback chamado na thread do chamador com (nick, numeroPróprio)
-     * @param onErro   callback chamado em caso de nick duplicado ou falha de rede
-     */
     public void entrar(String nick, EntradaCallback onSucesso, Consumer<String> onErro) {
         try {
             JogadorRequest req = JogadorRequest.newBuilder().setNick(nick).build();
@@ -49,8 +38,8 @@ public class GrpcGameClient {
 
             if (resp.getSucesso()) {
                 this.nick = nick;
-                this.meuNumero = resp.getNumero();
-                onSucesso.aceitar(nick, resp.getNumero(), resp.getMessage());
+                this.objeto = resp.getObjeto();
+                onSucesso.aceitar(nick, resp.getObjeto(), resp.getMessage());
             } else {
                 onErro.accept(resp.getMessage());
             }
@@ -59,14 +48,6 @@ public class GrpcGameClient {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // receberDicas (stream assíncrono)
-    // -----------------------------------------------------------------------
-
-    /**
-     * Abre o stream de dicas do servidor.
-     * Cada mensagem recebida aciona onMensagem na thread gRPC — use Platform.runLater no controller.
-     */
     public void receberDicas(Consumer<String> onMensagem, Runnable onConcluido, Consumer<String> onErro) {
         JogadorRequest req = JogadorRequest.newBuilder().setNick(nick).build();
 
@@ -88,40 +69,15 @@ public class GrpcGameClient {
         });
     }
 
-    // -----------------------------------------------------------------------
-    // obterEstado
-    // -----------------------------------------------------------------------
-
-    /**
-     * Obtém o estado atual do jogo (síncrono — chame em thread de background).
-     */
     public EstadoReply obterEstado() {
         return blockingStub.obterEstado(Empty.getDefaultInstance());
     }
 
-    // -----------------------------------------------------------------------
-    // iniciarJogo
-    // -----------------------------------------------------------------------
-
-    /**
-     * Inicia o jogo (somente o jogador inicial pode chamar isso).
-     *
-     * @return mensagem de retorno do servidor
-     */
     public String iniciarJogo() {
         DicaReply resp = blockingStub.iniciarJogo(Empty.getDefaultInstance());
         return resp.getMessage();
     }
 
-    // -----------------------------------------------------------------------
-    // enviarDica
-    // -----------------------------------------------------------------------
-
-    /**
-     * Envia uma dica ao servidor.
-     *
-     * @return mensagem de retorno do servidor
-     */
     public String enviarDica(String dica) {
         DicaRequest req = DicaRequest.newBuilder()
                 .setAutor(nick)
@@ -131,39 +87,22 @@ public class GrpcGameClient {
         return resp.getMessage();
     }
 
-    // -----------------------------------------------------------------------
-    // advinharNumero
-    // -----------------------------------------------------------------------
-
-    /**
-     * Tenta adivinhar o número do jogadorAlvo.
-     *
-     * @return AdvinharReply com acertou + mensagem
-     */
-    public AdvinharReply advinharNumero(String jogadorAlvo, int numero) {
-        AdvinharRequest req = AdvinharRequest.newBuilder()
+    public AdivinharReply adivinharObjeto(String jogadorAlvo, String objetoAdvinhar) {
+        AdivinharRequest req = AdivinharRequest.newBuilder()
                 .setJogador(nick)
                 .setAlvo(jogadorAlvo)
-                .setNumero(numero)
+                .setObjeto(objetoAdvinhar)
                 .build();
-        return blockingStub.advinharNumero(req);
+        return blockingStub.adivinharNumero(req);
     }
-
-    // -----------------------------------------------------------------------
-    // getters utilitários
-    // -----------------------------------------------------------------------
 
     public String getNick() {
         return nick;
     }
 
-    public int getMeuNumero() {
-        return meuNumero;
+    public String getObjeto() {
+        return objeto;
     }
-
-    // -----------------------------------------------------------------------
-    // shutdown
-    // -----------------------------------------------------------------------
 
     public void shutdown() {
         try {
@@ -173,12 +112,8 @@ public class GrpcGameClient {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // tipos de callback
-    // -----------------------------------------------------------------------
-
     @FunctionalInterface
     public interface EntradaCallback {
-        void aceitar(String nick, int numero, String mensagem);
+        void aceitar(String nick, String objeto, String mensagem);
     }
 }
