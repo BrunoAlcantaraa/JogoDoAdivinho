@@ -5,13 +5,15 @@ import com.google.protobuf.Empty;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
  * Camada de comunicação gRPC para a GUI.
  * Encapsula todos os stubs e chamadas de rede, sem depender de Scanner ou System.out.
- * Toda a lógica de apresentação fica no HelloController via callbacks.
+ * Toda a lógica de apresentação fica no Controller via callbacks.
  */
 public class GrpcGameClient {
 
@@ -30,6 +32,10 @@ public class GrpcGameClient {
         blockingStub = ControllerGrpc.newBlockingStub(channel);
         asyncStub = ControllerGrpc.newStub(channel);
     }
+
+    // -----------------------------------------------------------------------
+    // Jogo
+    // -----------------------------------------------------------------------
 
     public void entrar(String nick, EntradaCallback onSucesso, Consumer<String> onErro) {
         try {
@@ -59,7 +65,7 @@ public class GrpcGameClient {
 
             @Override
             public void onError(Throwable t) {
-                onErro.accept("Stream encerrado com erro: " + t.getMessage());
+                onErro.accept("Stream de dicas encerrado: " + t.getMessage());
             }
 
             @Override
@@ -87,14 +93,63 @@ public class GrpcGameClient {
         return resp.getMessage();
     }
 
-    public AdivinharReply adivinharObjeto(String jogadorAlvo, String objetoAdvinhar) {
+    public AdivinharReply adivinharObjeto(String jogadorAlvo, String objetoAdivinhar) {
         AdivinharRequest req = AdivinharRequest.newBuilder()
                 .setJogador(nick)
                 .setAlvo(jogadorAlvo)
-                .setObjeto(objetoAdvinhar)
+                .setObjeto(objetoAdivinhar)
                 .build();
         return blockingStub.adivinharNumero(req);
     }
+
+    // -----------------------------------------------------------------------
+    // Chat gRPC
+    // -----------------------------------------------------------------------
+
+    /**
+     * Abre o stream de recebimento de mensagens do chat.
+     * Deve ser chamado uma vez após o login, em background.
+     */
+    public void receberMensagensChat(Consumer<ChatReply> onMensagem,
+                                     Runnable onConcluido,
+                                     Consumer<String> onErro) {
+        JogadorRequest req = JogadorRequest.newBuilder().setNick(nick).build();
+
+        asyncStub.receberMensagensChat(req, new StreamObserver<ChatReply>() {
+            @Override
+            public void onNext(ChatReply msg) {
+                onMensagem.accept(msg);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                onErro.accept("Stream de chat encerrado: " + t.getMessage());
+            }
+
+            @Override
+            public void onCompleted() {
+                onConcluido.run();
+            }
+        });
+    }
+
+    /**
+     * Envia uma mensagem de chat para todos os jogadores.
+     * Chamada bloqueante — use em background.
+     */
+    public void enviarMensagemChat(String texto) {
+        String horario = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        ChatRequest req = ChatRequest.newBuilder()
+                .setNick(nick)
+                .setTexto(texto)
+                .setHorario(horario)
+                .build();
+        blockingStub.enviarMensagemChat(req);
+    }
+
+    // -----------------------------------------------------------------------
+    // Getters
+    // -----------------------------------------------------------------------
 
     public String getNick() {
         return nick;

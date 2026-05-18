@@ -24,6 +24,10 @@ service Controller {
 
   // Tentativa de adivinhar
   rpc adivinharNumero(AdivinharRequest) returns (AdivinharReply);
+
+  // Chat em tempo real entre jogadores
+  rpc enviarMensagemChat(ChatRequest) returns (ChatReply);
+  rpc receberMensagensChat(JogadorRequest) returns (stream ChatReply);
 }
 
 enum EstadoJogo {
@@ -47,6 +51,8 @@ message EstadoReply {
   string jogadorInicial = 2;
   int32 rodada = 3;
   EstadoJogo estado = 4;
+  string dicaAtual = 5;
+  string autorDicaAtual = 6;
 }
 
 message DicaRequest {
@@ -67,4 +73,16 @@ message AdivinharRequest {
 message AdivinharReply {
   bool acertou = 1;
   string message = 2;
+}
+
+message ChatRequest {
+  string nick = 1;
+  string texto = 2;
+  string horario = 3;
+}
+
+message ChatReply {
+  string nick = 1;
+  string texto = 2;
+  string horario = 3;
 }

@@ -7,6 +7,10 @@ import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
     private final JogadorRepository jogadorRepository = new JogadorRepository();
@@ -16,12 +20,21 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     private int rodadaAtual = 0;
     private EstadoJogo estadoJogo = EstadoJogo.ESPERANDO_INICIAR_JOGO;
 
+    // Dica atual da rodada
+    private String dicaAtual = "";
+    private String autorDicaAtual = "";
+
+    // Observers do chat (stream aberto por cada cliente)
+    private final List<StreamObserver<ChatReply>> chatObservers = new CopyOnWriteArrayList<>();
+
+    // -----------------------------------------------------------------------
+    // entrar
+    // -----------------------------------------------------------------------
+
     @Override
     public void entrar(JogadorRequest request, StreamObserver<JogadorReply> responseObserver) {
-
         String nick = request.getNick();
 
-        // Primeiro jogador a entrar será o jogadorInicial
         synchronized (this) {
             if (jogadorRepository.isEmpty()) {
                 jogadorInicial = nick;
@@ -32,7 +45,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         String objeto = jogadorRepository.adicionar(nick);
 
         JogadorReply resposta;
-
         if (objeto == null) {
             resposta = JogadorReply.newBuilder()
                     .setSucesso(false)
@@ -50,36 +62,38 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
+    // -----------------------------------------------------------------------
+    // receberDicas
+    // -----------------------------------------------------------------------
+
     @Override
     public void receberDicas(JogadorRequest request, StreamObserver<DicaReply> responseObserver) {
-
         String nick = request.getNick();
-
         Jogador jogador = jogadorRepository.buscar(nick);
 
         if (jogador == null) {
             responseObserver.onError(
-                    io.grpc.Status.NOT_FOUND
+                    Status.NOT_FOUND
                             .withDescription("Jogador '" + nick + "' não encontrado. Use entrar() primeiro.")
                             .asRuntimeException()
             );
             return;
         }
 
-        // Vincula o responseObserver ao objeto Jogador para envios futuros
         jogador.setObserver(responseObserver);
 
-        // Envia confirmação inicial
         DicaReply boasVindas = DicaReply.newBuilder()
-                .setMessage("[Servidor] Stream de dicas aberto para " + nick + ". Aguardando dicas...")
+                .setMessage("[Servidor] Stream de dicas aberto para " + nick + ". Aguardando jogo iniciar...")
                 .build();
         responseObserver.onNext(boasVindas);
-
     }
+
+    // -----------------------------------------------------------------------
+    // enviarDica
+    // -----------------------------------------------------------------------
 
     @Override
     public synchronized void enviarDica(DicaRequest request, StreamObserver<DicaReply> responseObserver) {
-
         String autor = request.getAutor();
         String dica = request.getDica();
 
@@ -99,6 +113,10 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
+        // Registra a dica atual da rodada
+        dicaAtual = dica;
+        autorDicaAtual = autor;
+
         notificarTodos(DicaReply.newBuilder()
                 .setMessage("[Dica de " + autor + "] " + dica)
                 .build());
@@ -107,7 +125,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         estadoJogo = EstadoJogo.ESPERANDO_ADVINHAR;
 
         notificarTodos(DicaReply.newBuilder()
-                .setMessage("[Servidor] Agora todos podem tentar adivinhar o número de " + jogadorAtual + "!")
+                .setMessage("[Servidor] Agora todos podem tentar adivinhar o objeto de " + jogadorAtual + "!")
                 .build());
 
         responseObserver.onNext(DicaReply.newBuilder()
@@ -116,10 +134,13 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
+    // -----------------------------------------------------------------------
+    // adivinharNumero
+    // -----------------------------------------------------------------------
+
     @Override
     public synchronized void adivinharNumero(AdivinharRequest request, StreamObserver<AdivinharReply> responseObserver) {
-
-        Jogador jogadorTentandoAdvinhar = jogadorRepository.buscar(request.getJogador());
+        Jogador jogadorTentando = jogadorRepository.buscar(request.getJogador());
         Jogador jogadorAlvo = jogadorRepository.buscar(jogadorAtual);
 
         if (estadoJogo != EstadoJogo.ESPERANDO_ADVINHAR) {
@@ -134,7 +155,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         if (request.getJogador().equals(jogadorAtual)) {
             responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
-                    .setMessage("Você não pode tentar adivinhar o próprio número.")
+                    .setMessage("Você não pode tentar adivinhar o próprio objeto.")
                     .build());
             responseObserver.onCompleted();
             return;
@@ -150,29 +171,33 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
 
         boolean acertou = request.getObjeto().equalsIgnoreCase(jogadorAlvo.getObjeto().getNomeObjeto());
-        jogadorTentandoAdvinhar.setTentouAdvinhar(true);
+        jogadorTentando.setTentouAdvinhar(true);
 
         if (acertou) {
             notificarTodos(DicaReply.newBuilder()
                     .setMessage("[Servidor] " + request.getJogador()
-                            + " acertou o número de " + jogadorAtual + "!")
+                            + " acertou o objeto de " + jogadorAtual + "!")
                     .build());
 
             rodadaAtual++;
+            dicaAtual = "";
+            autorDicaAtual = "";
             iniciarVez();
 
         } else {
             notificarTodos(DicaReply.newBuilder()
                     .setMessage("[Servidor] " + request.getJogador()
-                            + " tentou " + request.getObjeto() + " e errou.")
+                            + " tentou \"" + request.getObjeto() + "\" e errou.")
                     .build());
 
             if (jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
                 notificarTodos(DicaReply.newBuilder()
-                        .setMessage("[Servidor] Ninguém acertou o número de " + jogadorAtual + ". Próxima vez!")
+                        .setMessage("[Servidor] Ninguém acertou o objeto de " + jogadorAtual + ". Próxima rodada!")
                         .build());
 
                 rodadaAtual++;
+                dicaAtual = "";
+                autorDicaAtual = "";
                 iniciarVez();
             }
         }
@@ -181,9 +206,12 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .setAcertou(acertou)
                 .setMessage(acertou ? "Acertou!" : "Errou!")
                 .build());
-
         responseObserver.onCompleted();
     }
+
+    // -----------------------------------------------------------------------
+    // obterEstado — agora inclui dicaAtual e autorDicaAtual
+    // -----------------------------------------------------------------------
 
     @Override
     public void obterEstado(Empty request, StreamObserver<EstadoReply> responseObserver) {
@@ -193,6 +221,8 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                     .setJogadorInicial(jogadorInicial == null ? "" : jogadorInicial)
                     .setRodada(rodadaAtual)
                     .setEstado(estadoJogo == null ? EstadoJogo.ESPERANDO_INICIAR_JOGO : estadoJogo)
+                    .setDicaAtual(dicaAtual == null ? "" : dicaAtual)
+                    .setAutorDicaAtual(autorDicaAtual == null ? "" : autorDicaAtual)
                     .build();
 
             responseObserver.onNext(resposta);
@@ -200,7 +230,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
         } catch (Exception e) {
             e.printStackTrace();
-
             responseObserver.onError(
                     Status.INTERNAL
                             .withDescription("Erro ao obter estado")
@@ -210,9 +239,12 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // iniciarJogo
+    // -----------------------------------------------------------------------
+
     @Override
     public synchronized void iniciarJogo(Empty request, StreamObserver<DicaReply> responseObserver) {
-
         if (jogadorRepository.getTodos().isEmpty()) {
             responseObserver.onNext(DicaReply.newBuilder()
                     .setMessage("Não há jogadores para iniciar o jogo.")
@@ -230,8 +262,55 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
-    public synchronized void iniciarVez() {
+    // -----------------------------------------------------------------------
+    // Chat — enviarMensagemChat e receberMensagensChat
+    // -----------------------------------------------------------------------
 
+    @Override
+    public void receberMensagensChat(JogadorRequest request, StreamObserver<ChatReply> responseObserver) {
+        chatObservers.add(responseObserver);
+
+        // Envia confirmação inicial
+        ChatReply boasVindas = ChatReply.newBuilder()
+                .setNick("Sistema")
+                .setTexto("Chat conectado. Bem-vindo, " + request.getNick() + "!")
+                .setHorario(horarioAtual())
+                .build();
+        responseObserver.onNext(boasVindas);
+    }
+
+    @Override
+    public void enviarMensagemChat(ChatRequest request, StreamObserver<ChatReply> responseObserver) {
+        ChatReply mensagem = ChatReply.newBuilder()
+                .setNick(request.getNick())
+                .setTexto(request.getTexto())
+                .setHorario(request.getHorario().isEmpty() ? horarioAtual() : request.getHorario())
+                .build();
+
+        // Distribui para todos os clientes com stream de chat aberto
+        List<StreamObserver<ChatReply>> mortos = new ArrayList<>();
+        for (StreamObserver<ChatReply> obs : chatObservers) {
+            try {
+                obs.onNext(mensagem);
+            } catch (Exception e) {
+                mortos.add(obs);
+            }
+        }
+        chatObservers.removeAll(mortos);
+
+        responseObserver.onNext(ChatReply.newBuilder()
+                .setNick("Sistema")
+                .setTexto("Mensagem enviada.")
+                .setHorario(horarioAtual())
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers internos
+    // -----------------------------------------------------------------------
+
+    public synchronized void iniciarVez() {
         Jogador dono = jogadorRepository.getTodos()
                 .stream()
                 .toList()
@@ -246,36 +325,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build());
     }
 
-    public void iniciar() {
-
-        for (Jogador dono : jogadorRepository.getTodos()) {
-
-            estadoJogo = com.bruno.grpc.EstadoJogo.ESPERANDO_DICA;
-
-            DicaReply notificacaoTurno = DicaReply.newBuilder()
-                    .setMessage("[Servidor] Turno de " + dono.getNick()
-                            + " — aguardando dica. (Rodada " + (rodadaAtual + 1) + ")")
-                    .build();
-
-            notificarTodos(notificacaoTurno);
-
-            while (true) if (estadoJogo != EstadoJogo.ESPERANDO_DICA) break;
-
-            estadoJogo = EstadoJogo.ESPERANDO_ADVINHAR;
-
-            DicaReply notificacaoAdvinhar = DicaReply.newBuilder().
-                    setMessage("[Servidor] Agora todos podem tentar adivinhar o número de " + dono.getNick() + "!").build();
-
-            notificarTodos(notificacaoAdvinhar);
-
-            while (true) if (estadoJogo != EstadoJogo.ESPERANDO_ADVINHAR) break;
-
-            rodadaAtual++;
-
-        }
-
-    }
-
     public void notificarTodos(DicaReply dicaReply) {
         for (Jogador jogador : jogadorRepository.getTodos()) {
             if (jogador.isConectado()) {
@@ -288,4 +337,8 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
     }
 
+    private String horarioAtual() {
+        java.time.LocalTime agora = java.time.LocalTime.now();
+        return String.format("%02d:%02d", agora.getHour(), agora.getMinute());
+    }
 }
