@@ -90,6 +90,8 @@ public class Controller {
     private boolean jaAdivinhouNessaRodada = false;
     private String alvoTentadoNessaRodada = "";
     private String turnoObjetoAtualizado = "";
+    private boolean decisaoContinuarSolicitada = false;
+    private boolean resultadoPartidaMostrado = false;
     // Controle de limpeza de notificações por rodada
     private int ultimaRodadaNotificada = -1;
 
@@ -200,6 +202,8 @@ public class Controller {
 
         switch (estadoAtual) {
             case ESPERANDO_INICIAR_JOGO -> {
+                decisaoContinuarSolicitada = false;
+                resultadoPartidaMostrado = false;
                 boolean souInicial = meuNick.equals(estado.getJogadorInicial());
                 btnIniciarJogo.setDisable(!souInicial);
                 btnEnviarDica.setDisable(true);
@@ -213,6 +217,8 @@ public class Controller {
             }
 
             case ESPERANDO_DICA -> {
+                decisaoContinuarSolicitada = false;
+                resultadoPartidaMostrado = false;
                 btnIniciarJogo.setDisable(true);
                 boolean minhaVez = meuNick.equals(jogadorAtualNoServidor);
                 btnEnviarDica.setDisable(!minhaVez);
@@ -229,6 +235,7 @@ public class Controller {
             }
 
             case ESPERANDO_ADVINHAR -> {
+                decisaoContinuarSolicitada = false;
                 btnIniciarJogo.setDisable(true);
                 btnEnviarDica.setDisable(true);
                 boolean possoAdivinhar = !meuNick.equals(jogadorAtualNoServidor) && !jaAdivinhouNessaRodada;
@@ -244,6 +251,32 @@ public class Controller {
                     esperaLabel.setText("Aguardando dica...");
                     mostrarPainel(painelEspera);
                 }
+            }
+
+            case AGUARDANDO_CONTINUAR -> {
+                btnIniciarJogo.setDisable(true);
+                btnEnviarDica.setDisable(true);
+                btnAdivinhar.setDisable(true);
+                turnoJogadorLabel.setText("Aguardando decisão de: " + estado.getJogadorInicial());
+                mostrarResultadoPartida(jogadores);
+
+                if (meuNick.equals(estado.getJogadorInicial())) {
+                    esperaLabel.setText("Deseja continuar jogando?");
+                    mostrarPainel(painelEspera);
+                    solicitarDecisaoContinuar();
+                } else {
+                    esperaLabel.setText("Aguardando " + estado.getJogadorInicial() + " decidir se o jogo continua...");
+                    mostrarPainel(painelEspera);
+                }
+            }
+
+            case JOGO_ENCERRADO -> {
+                btnIniciarJogo.setDisable(true);
+                btnEnviarDica.setDisable(true);
+                btnAdivinhar.setDisable(true);
+                turnoJogadorLabel.setText("Jogo encerrado");
+                esperaLabel.setText("Jogo encerrado.");
+                mostrarPainel(painelEspera);
             }
         }
     }
@@ -283,11 +316,14 @@ public class Controller {
 
     @FXML
     private void aoIniciarJogo() {
+        Optional<Integer> totalRodadas = solicitarTotalRodadas();
+        if (totalRodadas.isEmpty()) return;
+
         btnIniciarJogo.setDisable(true);
 
         bgExecutor.submit(() -> {
             try {
-                String msg = grpcClient.iniciarJogo();
+                String msg = grpcClient.iniciarJogo(totalRodadas.get());
                 Platform.runLater(() -> adicionarNotificacao(msg));
             } catch (Exception e) {
                 Platform.runLater(() -> {
@@ -384,6 +420,86 @@ public class Controller {
                 Platform.runLater(() -> adicionarNotificacao("Chat: erro ao enviar."));
             }
         });
+    }
+
+    private void solicitarDecisaoContinuar() {
+        if (decisaoContinuarSolicitada) return;
+        decisaoContinuarSolicitada = true;
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Fim da partida");
+        alert.setHeaderText("Continuar jogando?");
+        alert.setContentText("A partida chegou ao limite de rodadas.");
+
+        ButtonType continuar = new ButtonType("Continuar");
+        ButtonType encerrar = new ButtonType("Encerrar");
+        alert.getButtonTypes().setAll(continuar, encerrar);
+
+        Optional<ButtonType> resultado = alert.showAndWait();
+        boolean deveContinuar = resultado.isPresent() && resultado.get() == continuar;
+
+        bgExecutor.submit(() -> {
+            try {
+                String msg = grpcClient.decidirContinuar(deveContinuar);
+                Platform.runLater(() -> adicionarNotificacao(msg));
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    decisaoContinuarSolicitada = false;
+                    adicionarNotificacao("Erro ao enviar decisão.");
+                });
+            }
+        });
+    }
+
+    private void mostrarResultadoPartida(List<JogadorInfo> jogadores) {
+        if (resultadoPartidaMostrado || jogadores == null || jogadores.isEmpty()) return;
+        resultadoPartidaMostrado = true;
+
+        int maiorPontuacao = jogadores.stream()
+                .mapToInt(JogadorInfo::getPontos)
+                .max()
+                .orElse(0);
+
+        List<String> vencedores = jogadores.stream()
+                .filter(jogador -> jogador.getPontos() == maiorPontuacao)
+                .map(JogadorInfo::getNick)
+                .toList();
+
+        String tituloResultado = vencedores.size() == 1 ? "Vencedor" : "Empate";
+        String mensagemResultado = vencedores.size() == 1
+                ? vencedores.get(0) + " venceu com " + maiorPontuacao + " pts."
+                : String.join(", ", vencedores) + " empataram com " + maiorPontuacao + " pts.";
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Fim da partida");
+        alert.setHeaderText(tituloResultado);
+        alert.setContentText(mensagemResultado);
+        alert.showAndWait();
+    }
+
+    private Optional<Integer> solicitarTotalRodadas() {
+        while (true) {
+            TextInputDialog dialog = new TextInputDialog("5");
+            dialog.setTitle("Configurar partida");
+            dialog.setHeaderText("Quantas rodadas deseja jogar?");
+            dialog.setContentText("Rodadas:");
+
+            Optional<String> resultado = dialog.showAndWait();
+            if (resultado.isEmpty()) {
+                return Optional.empty();
+            }
+
+            try {
+                int totalRodadas = Integer.parseInt(resultado.get().trim());
+                if (totalRodadas > 0) {
+                    return Optional.of(totalRodadas);
+                }
+            } catch (NumberFormatException ignored) {
+                // Mostra alerta abaixo.
+            }
+
+            mostrarAlerta("Valor inválido", "Informe um número de rodadas válido", "Use um número inteiro maior que zero.");
+        }
     }
 
     // -----------------------------------------------------------------------

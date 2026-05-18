@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 service Controller {
 
   // Inicia o jogo
-  rpc iniciarJogo(google.protobuf.Empty) returns (DicaReply);
+  rpc iniciarJogo(IniciarJogoRequest) returns (DicaReply);
 
   // Sorteia número para cliente
   rpc entrar(JogadorRequest) returns (JogadorReply);
@@ -34,12 +34,17 @@ service Controller {
 
   // Retorna o objeto secreto atual do jogador
   rpc obterMeuObjeto(JogadorRequest) returns (JogadorReply);
+
+  // Decide se uma nova partida deve comecar ao atingir o limite de rodadas
+  rpc decidirContinuar(ContinuarRequest) returns (DicaReply);
 }
 
 enum EstadoJogo {
   ESPERANDO_INICIAR_JOGO = 0;
   ESPERANDO_DICA = 1;
   ESPERANDO_ADVINHAR = 2;
+  AGUARDANDO_CONTINUAR = 3;
+  JOGO_ENCERRADO = 4;
 }
 
 message JogadorRequest {
@@ -69,6 +74,15 @@ message DicaRequest {
 
 message DicaReply {
   string message = 1;
+}
+
+message IniciarJogoRequest {
+  int32 totalRodadas = 1;
+}
+
+message ContinuarRequest {
+  string jogador = 1;
+  bool continuar = 2;
 }
 
 message AdivinharRequest {

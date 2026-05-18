@@ -80,8 +80,20 @@ public class GrpcGameClient {
         return blockingStub.obterEstado(Empty.getDefaultInstance());
     }
 
-    public String iniciarJogo() {
-        DicaReply resp = blockingStub.iniciarJogo(Empty.getDefaultInstance());
+    public String iniciarJogo(int totalRodadas) {
+        IniciarJogoRequest req = IniciarJogoRequest.newBuilder()
+                .setTotalRodadas(totalRodadas)
+                .build();
+        DicaReply resp = blockingStub.iniciarJogo(req);
+        return resp.getMessage();
+    }
+
+    public String decidirContinuar(boolean continuar) {
+        ContinuarRequest req = ContinuarRequest.newBuilder()
+                .setJogador(nick)
+                .setContinuar(continuar)
+                .build();
+        DicaReply resp = blockingStub.decidirContinuar(req);
         return resp.getMessage();
     }
 

@@ -18,18 +18,22 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     private static final int PONTOS_SEGUNDO_ACERTO = 3;
     private static final int PONTOS_DEMAIS_ACERTOS = 1;
     private static final int PONTOS_BONUS_DICA = 2;
+    private static final int LIMITE_RODADAS_PADRAO = 5;
 
     private final JogadorRepository jogadorRepository = new JogadorRepository();
 
     private String jogadorAtual = "";
     private String jogadorInicial = "";
     private int rodadaAtual = 0;
+    private int indiceJogadorAtual = 0;
     private EstadoJogo estadoJogo = EstadoJogo.ESPERANDO_INICIAR_JOGO;
 
     private String dicaAtual = "";
     private String autorDicaAtual = "";
     private int acertosNaRodada = 0;
     private boolean bonusDicaConcedidoNaRodada = false;
+    private boolean aguardandoDecisaoContinuar = false;
+    private int limiteRodadasPartida = LIMITE_RODADAS_PADRAO;
 
     private final List<StreamObserver<ChatReply>> chatObservers = new CopyOnWriteArrayList<>();
 
@@ -275,13 +279,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                         .setMessage(mensagemFimRodada)
                         .build());
 
-                renovarObjetoSeFoiAcertado(jogadorAlvo);
-                rodadaAtual++;
-                dicaAtual = "";
-                autorDicaAtual = "";
-                acertosNaRodada = 0;
-                bonusDicaConcedidoNaRodada = false;
-                iniciarVez();
+                finalizarRodada(jogadorAlvo);
             }
         }
 
@@ -290,13 +288,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                     .setMessage("Rodada encerrada.")
                     .build());
 
-            renovarObjetoSeFoiAcertado(jogadorAlvo);
-            rodadaAtual++;
-            dicaAtual = "";
-            autorDicaAtual = "";
-            acertosNaRodada = 0;
-            bonusDicaConcedidoNaRodada = false;
-            iniciarVez();
+            finalizarRodada(jogadorAlvo);
         }
 
         responseObserver.onNext(AdivinharReply.newBuilder()
@@ -342,7 +334,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     // -----------------------------------------------------------------------
 
     @Override
-    public synchronized void iniciarJogo(Empty request, StreamObserver<DicaReply> responseObserver) {
+    public synchronized void iniciarJogo(IniciarJogoRequest request, StreamObserver<DicaReply> responseObserver) {
         if (jogadorRepository.getTodos().isEmpty()) {
             responseObserver.onNext(DicaReply.newBuilder()
                     .setMessage("Nenhum jogador conectado.")
@@ -351,12 +343,65 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
+        limiteRodadasPartida = Math.max(1, request.getTotalRodadas());
         rodadaAtual = 1;
+        indiceJogadorAtual = 0;
+        aguardandoDecisaoContinuar = false;
         iniciarVez();
 
         responseObserver.onNext(DicaReply.newBuilder()
-                .setMessage("Jogo iniciado!")
+                .setMessage("Jogo iniciado com " + limiteRodadasPartida + " rodadas!")
                 .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public synchronized void decidirContinuar(ContinuarRequest request, StreamObserver<DicaReply> responseObserver) {
+        if (!request.getJogador().equals(jogadorInicial)) {
+            responseObserver.onNext(DicaReply.newBuilder()
+                    .setMessage("Apenas o jogador inicial pode decidir.")
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        if (!aguardandoDecisaoContinuar || estadoJogo != EstadoJogo.AGUARDANDO_CONTINUAR) {
+            responseObserver.onNext(DicaReply.newBuilder()
+                    .setMessage("O jogo não está aguardando decisão.")
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        aguardandoDecisaoContinuar = false;
+
+        if (request.getContinuar()) {
+            rodadaAtual = 1;
+            indiceJogadorAtual = 0;
+            notificarTodos(DicaReply.newBuilder()
+                    .setMessage("Nova partida iniciada com " + limiteRodadasPartida + " rodadas.")
+                    .build());
+            iniciarVez();
+
+            responseObserver.onNext(DicaReply.newBuilder()
+                    .setMessage("Continuando o jogo.")
+                    .build());
+        } else {
+            jogadorAtual = "";
+            dicaAtual = "";
+            autorDicaAtual = "";
+            indiceJogadorAtual = 0;
+            estadoJogo = EstadoJogo.JOGO_ENCERRADO;
+
+            notificarTodos(DicaReply.newBuilder()
+                    .setMessage("Jogo encerrado.")
+                    .build());
+
+            responseObserver.onNext(DicaReply.newBuilder()
+                    .setMessage("Jogo encerrado.")
+                    .build());
+        }
+
         responseObserver.onCompleted();
     }
 
@@ -407,10 +452,21 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     // -----------------------------------------------------------------------
 
     public synchronized void iniciarVez() {
-        Jogador dono = jogadorRepository.getTodos()
+        List<Jogador> jogadores = jogadorRepository.getTodos()
                 .stream()
-                .toList()
-                .get((rodadaAtual - 1) % jogadorRepository.getTodos().size());
+                .toList();
+
+        if (jogadores.isEmpty()) {
+            jogadorAtual = "";
+            estadoJogo = EstadoJogo.ESPERANDO_INICIAR_JOGO;
+            return;
+        }
+
+        if (indiceJogadorAtual >= jogadores.size()) {
+            indiceJogadorAtual = 0;
+        }
+
+        Jogador dono = jogadores.get(indiceJogadorAtual);
 
         jogadorAtual = dono.getNick();
         estadoJogo = EstadoJogo.ESPERANDO_DICA;
@@ -437,6 +493,37 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
     private String horarioAtual() {
         java.time.LocalTime agora = java.time.LocalTime.now();
         return String.format("%02d:%02d", agora.getHour(), agora.getMinute());
+    }
+
+    private void finalizarRodada(Jogador jogadorAlvo) {
+        renovarObjetoSeFoiAcertado(jogadorAlvo);
+        dicaAtual = "";
+        autorDicaAtual = "";
+        acertosNaRodada = 0;
+        bonusDicaConcedidoNaRodada = false;
+
+        int totalJogadores = jogadorRepository.getTodos().size();
+        boolean rodadaCompleta = totalJogadores <= 1 || indiceJogadorAtual >= totalJogadores - 1;
+
+        if (rodadaCompleta) {
+            if (rodadaAtual >= limiteRodadasPartida) {
+                jogadorAtual = "";
+                estadoJogo = EstadoJogo.AGUARDANDO_CONTINUAR;
+                aguardandoDecisaoContinuar = true;
+
+                notificarTodos(DicaReply.newBuilder()
+                        .setMessage("Fim da partida. Aguardando decisão de " + jogadorInicial + ".")
+                        .build());
+                return;
+            }
+
+            rodadaAtual++;
+            indiceJogadorAtual = 0;
+        } else {
+            indiceJogadorAtual++;
+        }
+
+        iniciarVez();
     }
 
     private void renovarObjetoSeFoiAcertado(Jogador jogadorAlvo) {

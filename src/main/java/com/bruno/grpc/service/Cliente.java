@@ -103,10 +103,14 @@ public class Cliente {
                     ultimoAlvoTentado = "";
 
                     if (estadoReply.getJogadorInicial().equals(nick)) {
-                        System.out.print("Pressione ENTER para iniciar o jogo: ");
-                        scanner.nextLine();
+                        System.out.print("Quantas rodadas deseja jogar? ");
+                        int totalRodadas = lerTotalRodadas(scanner);
 
-                        DicaReply response = blockingStub.iniciarJogo(Empty.getDefaultInstance());
+                        DicaReply response = blockingStub.iniciarJogo(
+                                IniciarJogoRequest.newBuilder()
+                                        .setTotalRodadas(totalRodadas)
+                                        .build()
+                        );
                         System.out.println(response.getMessage());
                     } else {
                         System.out.println("Aguardando " + estadoReply.getJogadorInicial() + " iniciar o jogo...");
@@ -175,6 +179,21 @@ public class Cliente {
 
         } finally {
             channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+        }
+    }
+
+    private static int lerTotalRodadas(Scanner scanner) {
+        while (true) {
+            String entrada = scanner.nextLine();
+            try {
+                int totalRodadas = Integer.parseInt(entrada.trim());
+                if (totalRodadas > 0) {
+                    return totalRodadas;
+                }
+            } catch (NumberFormatException ignored) {
+                // Solicita novamente abaixo.
+            }
+            System.out.print("Informe um número inteiro maior que zero: ");
         }
     }
 }
