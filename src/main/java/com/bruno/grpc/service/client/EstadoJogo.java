@@ -1,4 +1,4 @@
-package com.bruno.grpc.view.client;
+package com.bruno.grpc.service.client;
 
 import com.bruno.grpc.EstadoReply;
 import com.bruno.grpc.JogadorInfo;
@@ -10,17 +10,11 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 
-/**
- * Faz polling periódico de obterEstado() e listarJogadores() no servidor.
- * Notifica o controller quando o estado ou a lista de jogadores muda.
- * Roda em thread de background; as notificações são despachadas via
- * Platform.runLater para a thread do JavaFX.
- */
-public class GameStatePoller {
+public class EstadoJogo {
 
     private static final long INTERVALO_MS = 1000;
 
-    private final GrpcGameClient client;
+    private final Cliente client;
     private final BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou;
 
     private final ScheduledExecutorService executor =
@@ -35,12 +29,11 @@ public class GameStatePoller {
     private Map<String, Integer> ultimasPontuacoes = new HashMap<>();
     private volatile boolean rodando = false;
 
-    public GameStatePoller(GrpcGameClient client, BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou) {
+    public EstadoJogo(Cliente client, BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou) {
         this.client = client;
         this.onEstadoMudou = onEstadoMudou;
     }
 
-    /** Inicia o polling. Pode ser chamado na thread JavaFX sem problemas. */
     public void iniciar() {
         if (rodando) return;
         rodando = true;
@@ -66,7 +59,7 @@ public class GameStatePoller {
                     Platform.runLater(() -> onEstadoMudou.accept(estado, jogadores));
                 }
             } catch (Exception e) {
-                // Ignora erros de rede transitórios; o poller continua tentando
+                // Ignora erros de rede
             }
         }, 0, INTERVALO_MS, TimeUnit.MILLISECONDS);
     }
@@ -83,7 +76,6 @@ public class GameStatePoller {
         return snapshot;
     }
 
-    /** Para o polling. */
     public void parar() {
         rodando = false;
         executor.shutdownNow();

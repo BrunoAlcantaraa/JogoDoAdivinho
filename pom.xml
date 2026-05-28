@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.bruno</groupId>
-    <artifactId>jogo-advinhar-numero</artifactId>
+    <artifactId>jogo-adivinhacao</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
@@ -39,7 +39,6 @@
             <version>${grpc.version}</version>
         </dependency>
 
-        <!-- Necessário pelo grpc-stub no Java 9+ -->
         <dependency>
             <groupId>org.apache.tomcat</groupId>
             <artifactId>annotations-api</artifactId>
@@ -47,7 +46,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Protobuf runtime + well-known types (Empty) -->
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
@@ -118,15 +116,9 @@
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
-                <executions>
-                    <!-- Launcher da interface -->
-                    <execution>
-                        <id>gui</id>
-                        <configuration>
-                            <mainClass>com.bruno.grpc.view.Launcher</mainClass>
-                        </configuration>
-                    </execution>
-                </executions>
+                <configuration>
+                    <mainClass>com.bruno.grpc.view.Launcher</mainClass>
+                </configuration>
             </plugin>
 
             <plugin>
@@ -138,7 +130,7 @@
                         <id>servidor</id>
                         <goals><goal>java</goal></goals>
                         <configuration>
-                            <mainClass>com.bruno.grpc.service.Servidor</mainClass>
+                            <mainClass>com.bruno.grpc.service.server.Servidor</mainClass>
                         </configuration>
                     </execution>
                 </executions>

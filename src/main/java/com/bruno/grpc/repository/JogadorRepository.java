@@ -2,8 +2,8 @@ package com.bruno.grpc.repository;
 
 import com.bruno.grpc.DicaReply;
 import com.bruno.grpc.entities.Jogador;
-import com.bruno.grpc.view.entities.ImagemObjeto;
-import com.bruno.grpc.view.util.ImagemGerenciador;
+import com.bruno.grpc.entities.ImagemObjeto;
+import com.bruno.grpc.util.ImagemGerenciador;
 import io.grpc.stub.StreamObserver;
 
 import java.util.Collection;
@@ -46,18 +46,18 @@ public class JogadorRepository {
         return novoObjeto.getNomeObjeto();
     }
 
-    public boolean todosTentaramAdvinhar(String dono) {
+    public boolean todosTentaramAdivinhar(String dono) {
         for (Jogador jogador : jogadores.values()) {
-            if (!jogador.isTentouAdvinhar() && !jogador.getNick().equals(dono)) {
+            if (!jogador.isTentouAdivinhar() && !jogador.getNick().equals(dono)) {
                 return false;
             }
         }
         return true;
     }
 
-    public void resetarChancesAdvinhar() {
+    public void resetarChancesAdivinhar() {
         for (Jogador jogador : jogadores.values()) {
-            jogador.setTentouAdvinhar(false);
+            jogador.setTentouAdivinhar(false);
         }
     }
 

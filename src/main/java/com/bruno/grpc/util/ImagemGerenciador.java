@@ -1,6 +1,6 @@
-package com.bruno.grpc.view.util;
+package com.bruno.grpc.util;
 
-import com.bruno.grpc.view.entities.ImagemObjeto;
+import com.bruno.grpc.entities.ImagemObjeto;
 //import org.example.jogodoadivinhogui.ClassesCoisas.ImagemJogo;
 
 import java.util.ArrayList;

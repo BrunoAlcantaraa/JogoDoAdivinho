@@ -2,12 +2,11 @@ package com.bruno.grpc.view;
 
 import com.bruno.grpc.AdivinharReply;
 import com.bruno.grpc.ChatReply;
-import com.bruno.grpc.EstadoJogo;
 import com.bruno.grpc.EstadoReply;
 import com.bruno.grpc.JogadorInfo;
-import com.bruno.grpc.view.client.GrpcGameClient;
-import com.bruno.grpc.view.client.GameStatePoller;
-import com.bruno.grpc.view.entities.Mensagem;
+import com.bruno.grpc.service.client.Cliente;
+import com.bruno.grpc.service.client.EstadoJogo;
+import com.bruno.grpc.entities.Mensagem;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -25,15 +24,11 @@ import java.util.concurrent.Executors;
 
 public class Controller {
 
-    // -----------------------------------------------------------------------
-    // Campos FXML
-    // -----------------------------------------------------------------------
-
     // Chat
     @FXML private ListView<Mensagem> listMensagens;
     @FXML private TextField campoMensagem;
 
-    // Notificações do servidor (stream de dicas)
+    // Notificações do servidor
     @FXML private ListView<String> listNotificacoes;
 
     // Lista de jogadores
@@ -47,10 +42,10 @@ public class Controller {
     @FXML private Label pontuacaoLabel;
     @FXML private Label esperaLabel;
 
-    // Área central — painel raiz (StackPane)
+    // Painel central
     @FXML private StackPane painelCentral;
 
-    // Sub-painéis da área central
+    // Subpaineis
     @FXML private VBox painelEspera;
     @FXML private VBox painelSuaVez;
     @FXML private VBox painelDica;
@@ -68,12 +63,8 @@ public class Controller {
     @FXML private Button btnAdivinhar;
     @FXML private Button btnEnviarMsg;
 
-    // -----------------------------------------------------------------------
-    // Infraestrutura gRPC
-    // -----------------------------------------------------------------------
-
-    private GrpcGameClient grpcClient;
-    private GameStatePoller statePoller;
+    private Cliente grpcClient;
+    private EstadoJogo statePoller;
 
     private final ExecutorService bgExecutor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "grpc-bg");
@@ -81,23 +72,15 @@ public class Controller {
         return t;
     });
 
-    // -----------------------------------------------------------------------
-    // Estado local da tela
-    // -----------------------------------------------------------------------
+    private com.bruno.grpc.EstadoJogo estadoAtual = com.bruno.grpc.EstadoJogo.ESPERANDO_INICIAR_JOGO;
 
-    private EstadoJogo estadoAtual = EstadoJogo.ESPERANDO_INICIAR_JOGO;
     private String jogadorAtualNoServidor = "";
     private boolean jaAdivinhouNessaRodada = false;
     private String alvoTentadoNessaRodada = "";
     private String turnoObjetoAtualizado = "";
     private boolean decisaoContinuarSolicitada = false;
     private boolean resultadoPartidaMostrado = false;
-    // Controle de limpeza de notificações por rodada
     private int ultimaRodadaNotificada = -1;
-
-    // -----------------------------------------------------------------------
-    // Inicialização
-    // -----------------------------------------------------------------------
 
     @FXML
     public void initialize() {
@@ -121,7 +104,7 @@ public class Controller {
         }
 
         String nick = resultado.get().trim();
-        grpcClient = new GrpcGameClient();
+        grpcClient = new Cliente();
 
         bgExecutor.submit(() -> {
             grpcClient.entrar(
@@ -145,14 +128,14 @@ public class Controller {
 
         carregarImagemObjeto(objeto);
 
-        // Abre stream de dicas (notificações do servidor)
+        // Stream de dicas
         bgExecutor.submit(() -> grpcClient.receberDicas(
                 msg -> Platform.runLater(() -> adicionarNotificacao(msg)),
                 () -> Platform.runLater(() -> adicionarNotificacao("Stream encerrado.")),
                 erro -> Platform.runLater(() -> adicionarNotificacao("Erro: " + erro))
         ));
 
-        // Abre stream do chat gRPC
+        // Stream do chat
         bgExecutor.submit(() -> grpcClient.receberMensagensChat(
                 chatMsg -> Platform.runLater(() -> adicionarMensagemChat(chatMsg)),
                 () -> Platform.runLater(() -> adicionarNotificacao("Chat encerrado.")),
@@ -160,13 +143,9 @@ public class Controller {
         ));
 
         // Inicia polling de estado + lista de jogadores
-        statePoller = new GameStatePoller(grpcClient, this::aoEstadoMudar);
+        statePoller = new EstadoJogo(grpcClient, this::aoEstadoMudar);
         statePoller.iniciar();
     }
-
-    // -----------------------------------------------------------------------
-    // Reação a mudanças de estado
-    // -----------------------------------------------------------------------
 
     private void aoEstadoMudar(EstadoReply estado, List<JogadorInfo> jogadores) {
         estadoAtual = estado.getEstado();
@@ -177,10 +156,10 @@ public class Controller {
         turnoLabel.setText(rodada > 0 ? "Rodada " + rodada : "Rodada —");
         turnoJogadorLabel.setText("Vez de: " + (jogadorAtualNoServidor.isEmpty() ? "—" : jogadorAtualNoServidor));
 
-        // Atualiza lista de jogadores com pontuação
+        // Atualiza lista de jogadores
         atualizarListaJogadores(jogadores, meuNick);
 
-        // Atualiza pontuação própria a partir da lista
+        // Atualiza pont
         for (JogadorInfo ji : jogadores) {
             if (ji.getNick().equals(meuNick)) {
                 pontuacaoLabel.setText("Pontuação: " + ji.getPontos());
@@ -188,7 +167,7 @@ public class Controller {
             }
         }
 
-        // Reseta flag de "já tentou adivinhar" quando o alvo muda
+        // Reseta "já tentou adivinhar" quando muda
         if (!alvoTentadoNessaRodada.equals(jogadorAtualNoServidor)) {
             jaAdivinhouNessaRodada = false;
             alvoTentadoNessaRodada = jogadorAtualNoServidor;
@@ -281,10 +260,6 @@ public class Controller {
         }
     }
 
-    /**
-     * Atualiza a ListView de jogadores com nick e pontuação.
-     * Destaca o jogador local com " (você)".
-     */
     private void atualizarListaJogadores(List<JogadorInfo> jogadores, String meuNick) {
         listJogadores.getItems().clear();
         for (JogadorInfo ji : jogadores) {
@@ -296,23 +271,12 @@ public class Controller {
         }
     }
 
-    /**
-     * Remove notificações de rodada (que começam com "Turno de" ou "Rodada")
-     * para não poluir a tela entre rodadas. Mensagens do stream de dicas
-     * (erros, acertos) da rodada anterior são limpas; o chat permanece intacto.
-     */
     private void limparNotificacoesDaRodada() {
-        // Remove as notificações de sistema mais antigas, mantendo as últimas 5
-        // para contexto. Isso evita tela poluída sem apagar tudo abruptamente.
         var items = listNotificacoes.getItems();
         while (items.size() > 5) {
             items.remove(0);
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Ações dos botões
-    // -----------------------------------------------------------------------
 
     @FXML
     private void aoIniciarJogo() {
@@ -359,7 +323,7 @@ public class Controller {
                 Platform.runLater(() -> {
                     mostrarAlerta("Erro", "Falha ao enviar dica", e.getMessage());
                     if (grpcClient.getNick().equals(jogadorAtualNoServidor)
-                            && estadoAtual == EstadoJogo.ESPERANDO_DICA) {
+                            && estadoAtual == com.bruno.grpc.EstadoJogo.ESPERANDO_DICA) {
                         btnEnviarDica.setDisable(false);
                     }
                 });
@@ -502,10 +466,6 @@ public class Controller {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Utilitários de UI
-    // -----------------------------------------------------------------------
-
     private void mostrarPainel(VBox painel) {
         painelEspera.setVisible(false);
         painelSuaVez.setVisible(false);
@@ -557,7 +517,7 @@ public class Controller {
             objetoImagemSuaVez.setImage(img);
             nomeObjetoSuaVezLabel.setText(nomeObjeto);
         } catch (Exception e) {
-            // Imagem não encontrada — ignora silenciosamente
+            // Imagem não encontrada
         }
     }
 
@@ -595,10 +555,6 @@ public class Controller {
         alert.setContentText(conteudo);
         alert.showAndWait();
     }
-
-    // -----------------------------------------------------------------------
-    // Cleanup ao fechar a janela
-    // -----------------------------------------------------------------------
 
     public void shutdown() {
         if (statePoller != null) statePoller.parar();

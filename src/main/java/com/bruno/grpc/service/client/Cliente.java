@@ -1,4 +1,4 @@
-package com.bruno.grpc.view.client;
+package com.bruno.grpc.service.client;
 
 import com.bruno.grpc.*;
 import com.google.protobuf.Empty;
@@ -11,12 +11,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Camada de comunicação gRPC para a GUI.
- * Encapsula todos os stubs e chamadas de rede, sem depender de Scanner ou System.out.
- * Toda a lógica de apresentação fica no Controller via callbacks.
- */
-public class GrpcGameClient {
+public class Cliente {
 
     private static final String HOST = "localhost";
     private static final int PORT = 50051;
@@ -28,15 +23,11 @@ public class GrpcGameClient {
     private String nick;
     private String objeto;
 
-    public GrpcGameClient() {
+    public Cliente() {
         channel = Grpc.newChannelBuilderForAddress(HOST, PORT, InsecureChannelCredentials.create()).build();
         blockingStub = ControllerGrpc.newBlockingStub(channel);
         asyncStub = ControllerGrpc.newStub(channel);
     }
-
-    // -----------------------------------------------------------------------
-    // Jogo
-    // -----------------------------------------------------------------------
 
     public void entrar(String nick, EntradaCallback onSucesso, Consumer<String> onErro) {
         try {
@@ -126,17 +117,10 @@ public class GrpcGameClient {
         return this.objeto;
     }
 
-    /**
-     * Retorna a lista de jogadores com pontuação atual.
-     */
     public List<JogadorInfo> listarJogadores() {
         ListaJogadoresReply resp = blockingStub.listarJogadores(Empty.getDefaultInstance());
         return resp.getJogadoresList();
     }
-
-    // -----------------------------------------------------------------------
-    // Chat gRPC
-    // -----------------------------------------------------------------------
 
     public void receberMensagensChat(Consumer<ChatReply> onMensagem,
                                      Runnable onConcluido,
@@ -170,10 +154,6 @@ public class GrpcGameClient {
                 .build();
         blockingStub.enviarMensagemChat(req);
     }
-
-    // -----------------------------------------------------------------------
-    // Getters
-    // -----------------------------------------------------------------------
 
     public String getNick() {
         return nick;

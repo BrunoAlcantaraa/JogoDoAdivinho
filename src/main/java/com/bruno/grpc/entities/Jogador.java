@@ -1,7 +1,6 @@
 package com.bruno.grpc.entities;
 
 import com.bruno.grpc.DicaReply;
-import com.bruno.grpc.view.entities.ImagemObjeto;
 import io.grpc.stub.StreamObserver;
 
 public class Jogador {
@@ -30,11 +29,11 @@ public class Jogador {
         this.pontos = pontos;
     }
 
-    public boolean isTentouAdvinhar() {
+    public boolean isTentouAdivinhar() {
         return tentouAdvinhar;
     }
 
-    public void setTentouAdvinhar(boolean tentouAdvinhar) {
+    public void setTentouAdivinhar(boolean tentouAdvinhar) {
         this.tentouAdvinhar = tentouAdvinhar;
     }
 

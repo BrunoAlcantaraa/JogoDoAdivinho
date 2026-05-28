@@ -37,10 +37,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
 
     private final List<StreamObserver<ChatReply>> chatObservers = new CopyOnWriteArrayList<>();
 
-    // -----------------------------------------------------------------------
-    // entrar
-    // -----------------------------------------------------------------------
-
     @Override
     public void entrar(JogadorRequest request, StreamObserver<JogadorReply> responseObserver) {
         String nick = request.getNick();
@@ -71,10 +67,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onNext(resposta);
         responseObserver.onCompleted();
     }
-
-    // -----------------------------------------------------------------------
-    // listarJogadores
-    // -----------------------------------------------------------------------
 
     @Override
     public void listarJogadores(Empty request, StreamObserver<ListaJogadoresReply> responseObserver) {
@@ -112,10 +104,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
-    // -----------------------------------------------------------------------
-    // receberDicas
-    // -----------------------------------------------------------------------
-
     @Override
     public void receberDicas(JogadorRequest request, StreamObserver<DicaReply> responseObserver) {
         String nick = request.getNick();
@@ -137,10 +125,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build();
         responseObserver.onNext(boasVindas);
     }
-
-    // -----------------------------------------------------------------------
-    // enviarDica
-    // -----------------------------------------------------------------------
 
     @Override
     public synchronized void enviarDica(DicaRequest request, StreamObserver<DicaReply> responseObserver) {
@@ -172,7 +156,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .setMessage("Dica de " + autor + ": " + dica)
                 .build());
 
-        jogadorRepository.resetarChancesAdvinhar();
+        jogadorRepository.resetarChancesAdivinhar();
         estadoJogo = EstadoJogo.ESPERANDO_ADVINHAR;
 
         notificarTodos(DicaReply.newBuilder()
@@ -184,10 +168,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build());
         responseObserver.onCompleted();
     }
-
-    // -----------------------------------------------------------------------
-    // adivinharNumero
-    // -----------------------------------------------------------------------
 
     @Override
     public synchronized void adivinharObjeto(AdivinharRequest request, StreamObserver<AdivinharReply> responseObserver) {
@@ -230,7 +210,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             return;
         }
 
-        if (jogadorTentando.isTentouAdvinhar()) {
+        if (jogadorTentando.isTentouAdivinhar()) {
             responseObserver.onNext(AdivinharReply.newBuilder()
                     .setAcertou(false)
                     .setMessage("Você já tentou nesta rodada.")
@@ -241,7 +221,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         }
 
         boolean acertou = request.getObjeto().equalsIgnoreCase(jogadorAlvo.getObjeto().getNomeObjeto());
-        jogadorTentando.setTentouAdvinhar(true);
+        jogadorTentando.setTentouAdivinhar(true);
 
         int pontuacaoAtualizada = jogadorTentando.getPontos();
 
@@ -270,7 +250,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                     .setMessage(request.getJogador() + " errou.")
                     .build());
 
-            if (jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
+            if (jogadorRepository.todosTentaramAdivinhar(jogadorAlvo.getNick())) {
                 String mensagemFimRodada = acertosNaRodada == 0
                         ? "Ninguém acertou. Próxima rodada!"
                         : "Rodada encerrada.";
@@ -283,7 +263,7 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             }
         }
 
-        if (acertou && jogadorRepository.todosTentaramAdvinhar(jogadorAlvo.getNick())) {
+        if (acertou && jogadorRepository.todosTentaramAdivinhar(jogadorAlvo.getNick())) {
             notificarTodos(DicaReply.newBuilder()
                     .setMessage("Rodada encerrada.")
                     .build());
@@ -298,10 +278,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build());
         responseObserver.onCompleted();
     }
-
-    // -----------------------------------------------------------------------
-    // obterEstado
-    // -----------------------------------------------------------------------
 
     @Override
     public void obterEstado(Empty request, StreamObserver<EstadoReply> responseObserver) {
@@ -328,10 +304,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
             );
         }
     }
-
-    // -----------------------------------------------------------------------
-    // iniciarJogo
-    // -----------------------------------------------------------------------
 
     @Override
     public synchronized void iniciarJogo(IniciarJogoRequest request, StreamObserver<DicaReply> responseObserver) {
@@ -405,10 +377,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
         responseObserver.onCompleted();
     }
 
-    // -----------------------------------------------------------------------
-    // Chat
-    // -----------------------------------------------------------------------
-
     @Override
     public void receberMensagensChat(JogadorRequest request, StreamObserver<ChatReply> responseObserver) {
         chatObservers.add(responseObserver);
@@ -446,10 +414,6 @@ public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
                 .build());
         responseObserver.onCompleted();
     }
-
-    // -----------------------------------------------------------------------
-    // Helpers internos
-    // -----------------------------------------------------------------------
 
     public synchronized void iniciarVez() {
         List<Jogador> jogadores = jogadorRepository.getTodos()

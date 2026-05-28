@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option java_multiple_files = true;
 option java_package = "com.bruno.grpc";
-option java_outer_classname = "AdvinharProto";
+option java_outer_classname = "AdivinharProto";
 
 import "google/protobuf/empty.proto";
 
@@ -20,6 +20,7 @@ service Controller {
   // Envia dica
   rpc enviarDica(DicaRequest) returns (DicaReply);
 
+  // Abre stream para dicas
   rpc receberDicas(JogadorRequest) returns (stream DicaReply);
 
   // Tentativa de adivinhar

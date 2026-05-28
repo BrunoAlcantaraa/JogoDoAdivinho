@@ -1,4 +1,4 @@
-package com.bruno.grpc.service;
+package com.bruno.grpc.service.server;
 
 import com.bruno.grpc.controller.ControllerImpl;
 import io.grpc.Grpc;

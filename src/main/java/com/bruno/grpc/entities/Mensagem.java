@@ -1,4 +1,4 @@
-package com.bruno.grpc.view.entities;
+package com.bruno.grpc.entities;
 
 import java.time.LocalDateTime;
 

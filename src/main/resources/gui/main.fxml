@@ -19,23 +19,17 @@
             fx:controller="com.bruno.grpc.view.Controller">
    <children>
 
-      <!-- ============================================================ -->
-      <!-- PAINEL ESQUERDO: Jogadores + Acoes                           -->
-      <!-- ============================================================ -->
       <VBox layoutX="14.0" layoutY="14.0" prefWidth="200.0" spacing="8.0">
 
-         <!-- Cabecalho Jogadores -->
          <Label text="Jogadores" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #2d3748;">
             <font><Font size="15.0" /></font>
          </Label>
 
-         <!-- Lista de jogadores com pontuacao -->
          <ListView fx:id="listJogadores" prefHeight="240.0" prefWidth="200.0"
                    style="-fx-border-color: #cbd5e0; -fx-border-radius: 6; -fx-background-radius: 6; -fx-background-color: white; -fx-font-size: 12px;" />
 
          <Separator style="-fx-padding: 2 0 2 0;" />
 
-         <!-- Botoes de acao -->
          <Button fx:id="btnIniciarJogo"
                  mnemonicParsing="false"
                  onAction="#aoIniciarJogo"
@@ -62,10 +56,6 @@
 
       </VBox>
 
-      <!-- ============================================================ -->
-      <!-- AREA CENTRAL: Imagem/Dica + Status + Chat                    -->
-      <!-- ============================================================ -->
-
       <StackPane fx:id="painelCentral"
                  layoutX="228.0" layoutY="14.0"
                  prefHeight="370.0" prefWidth="544.0"
@@ -76,7 +66,6 @@
                     pickOnBounds="true" preserveRatio="true"
                     visible="false" />
 
-         <!-- Painel de dica atual -->
          <VBox fx:id="painelDica" alignment="CENTER" spacing="16.0"
                style="-fx-padding: 30;" visible="false">
             <Label text="Dica da rodada:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
@@ -89,7 +78,6 @@
                    style="-fx-font-size: 14px; -fx-text-fill: #a0aec0; -fx-font-style: italic;" />
          </VBox>
 
-         <!-- Painel quando e a vez do jogador dar dica -->
          <VBox fx:id="painelSuaVez" alignment="CENTER" spacing="10.0"
                style="-fx-padding: 20;" visible="false">
             <Label text="Seu objeto secreto:" style="-fx-font-size: 14px; -fx-text-fill: #718096;" />
@@ -103,7 +91,6 @@
                    style="-fx-font-size: 12px; -fx-text-fill: #a0aec0;" />
          </VBox>
 
-         <!-- Painel de espera -->
          <VBox fx:id="painelEspera" alignment="CENTER" spacing="10.0" visible="true">
             <Label text="&#9203;" style="-fx-font-size: 48px;" />
             <Label fx:id="esperaLabel"
@@ -113,7 +100,6 @@
 
       </StackPane>
 
-      <!-- Faixa de status abaixo da area central -->
       <HBox layoutX="228.0" layoutY="393.0" prefWidth="544.0" prefHeight="34.0"
             alignment="CENTER_LEFT" spacing="20.0"
             style="-fx-background-color: white; -fx-padding: 4 14 4 14; -fx-border-color: #cbd5e0; -fx-border-radius: 6; -fx-background-radius: 6;">
@@ -157,9 +143,6 @@
                  style="-fx-background-color: #4299e1; -fx-text-fill: white; -fx-background-radius: 6; -fx-cursor: hand;" />
       </HBox>
 
-      <!-- ============================================================ -->
-      <!-- PAINEL DIREITO: Jogador local + Rodada + Notificacoes        -->
-      <!-- ============================================================ -->
       <VBox layoutX="786.0" layoutY="14.0" prefWidth="200.0" spacing="8.0">
 
          <Label fx:id="turnoLabel"
