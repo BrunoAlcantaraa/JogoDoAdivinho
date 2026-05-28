@@ -1,11 +1,11 @@
-package com.bruno.grpc.view;
+package com.bruno.grpc.view.controller;
 
 import com.bruno.grpc.AdivinharReply;
 import com.bruno.grpc.ChatReply;
 import com.bruno.grpc.EstadoReply;
 import com.bruno.grpc.JogadorInfo;
 import com.bruno.grpc.service.client.Cliente;
-import com.bruno.grpc.service.client.EstadoJogo;
+import com.bruno.grpc.service.game.GameState;
 import com.bruno.grpc.entities.Mensagem;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -64,7 +64,7 @@ public class Controller {
     @FXML private Button btnEnviarMsg;
 
     private Cliente grpcClient;
-    private EstadoJogo statePoller;
+    private GameState statePoller;
 
     private final ExecutorService bgExecutor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "grpc-bg");
@@ -143,7 +143,7 @@ public class Controller {
         ));
 
         // Inicia polling de estado + lista de jogadores
-        statePoller = new EstadoJogo(grpcClient, this::aoEstadoMudar);
+        statePoller = new GameState(grpcClient, this::aoEstadoMudar);
         statePoller.iniciar();
     }
 

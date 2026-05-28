@@ -1,6 +1,6 @@
 package com.bruno.grpc.service.server;
 
-import com.bruno.grpc.controller.ControllerImpl;
+import com.bruno.grpc.service.game.GameServiceImpl;
 import io.grpc.Grpc;
 import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
@@ -13,7 +13,7 @@ public class Servidor {
                         50051,
                         InsecureServerCredentials.create()
                 )
-                .addService(new ControllerImpl())
+                .addService(new GameServiceImpl())
                 .build();
 
         server.start();

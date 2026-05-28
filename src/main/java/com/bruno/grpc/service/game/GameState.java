@@ -1,7 +1,8 @@
-package com.bruno.grpc.service.client;
+package com.bruno.grpc.service.game;
 
 import com.bruno.grpc.EstadoReply;
 import com.bruno.grpc.JogadorInfo;
+import com.bruno.grpc.service.client.Cliente;
 import javafx.application.Platform;
 
 import java.util.HashMap;
@@ -10,7 +11,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 
-public class EstadoJogo {
+public class GameState {
 
     private static final long INTERVALO_MS = 1000;
 
@@ -29,7 +30,7 @@ public class EstadoJogo {
     private Map<String, Integer> ultimasPontuacoes = new HashMap<>();
     private volatile boolean rodando = false;
 
-    public EstadoJogo(Cliente client, BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou) {
+    public GameState(Cliente client, BiConsumer<EstadoReply, List<JogadorInfo>> onEstadoMudou) {
         this.client = client;
         this.onEstadoMudou = onEstadoMudou;
     }

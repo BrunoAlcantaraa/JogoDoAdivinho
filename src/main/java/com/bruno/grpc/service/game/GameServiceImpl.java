@@ -1,4 +1,4 @@
-package com.bruno.grpc.controller;
+package com.bruno.grpc.service.game;
 
 import com.bruno.grpc.*;
 import com.bruno.grpc.entities.Jogador;
@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class ControllerImpl extends ControllerGrpc.ControllerImplBase {
+public class GameServiceImpl extends GameServiceGrpc.GameServiceImplBase {
 
     // O acerto vale mais para quem acerta primeiro na rodada.
     private static final int PONTOS_PRIMEIRO_ACERTO = 5;

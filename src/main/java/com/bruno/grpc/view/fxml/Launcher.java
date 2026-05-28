@@ -1,5 +1,6 @@
-package com.bruno.grpc.view;
+package com.bruno.grpc.view.fxml;
 
+import com.bruno.grpc.view.controller.Controller;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;

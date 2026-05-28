@@ -17,16 +17,16 @@ public class Cliente {
     private static final int PORT = 50051;
 
     private final ManagedChannel channel;
-    private final ControllerGrpc.ControllerBlockingStub blockingStub;
-    private final ControllerGrpc.ControllerStub asyncStub;
+    private final GameServiceGrpc.GameServiceBlockingStub blockingStub;
+    private final GameServiceGrpc.GameServiceStub asyncStub;
 
     private String nick;
     private String objeto;
 
     public Cliente() {
         channel = Grpc.newChannelBuilderForAddress(HOST, PORT, InsecureChannelCredentials.create()).build();
-        blockingStub = ControllerGrpc.newBlockingStub(channel);
-        asyncStub = ControllerGrpc.newStub(channel);
+        blockingStub = GameServiceGrpc.newBlockingStub(channel);
+        asyncStub = GameServiceGrpc.newStub(channel);
     }
 
     public void entrar(String nick, EntradaCallback onSucesso, Consumer<String> onErro) {

@@ -16,7 +16,7 @@
             style="-fx-background-color: #f0f2f5;"
             xmlns="http://javafx.com/javafx/17"
             xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.bruno.grpc.view.Controller">
+            fx:controller="com.bruno.grpc.view.controller.Controller">
    <children>
 
       <VBox layoutX="14.0" layoutY="14.0" prefWidth="200.0" spacing="8.0">

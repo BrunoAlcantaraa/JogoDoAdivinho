@@ -6,7 +6,7 @@ option java_outer_classname = "AdivinharProto";
 
 import "google/protobuf/empty.proto";
 
-service Controller {
+service GameService {
 
   // Inicia o jogo
   rpc iniciarJogo(IniciarJogoRequest) returns (DicaReply);

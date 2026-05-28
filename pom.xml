@@ -117,7 +117,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.bruno.grpc.view.Launcher</mainClass>
+                    <mainClass>com.bruno.grpc.view.fxml.Launcher</mainClass>
                 </configuration>
             </plugin>
 
